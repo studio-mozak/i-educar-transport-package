@@ -30,6 +30,11 @@ class VeiculoController extends Portabilis_Controller_Page_EditController
             'help' => '',
         ],
 
+        'data_licenca' => [
+            'label' => 'Data de licença',
+            'help' => '',
+        ],
+
         'chassi' => [
             'label' => 'Chassi',
             'help' => '',
@@ -173,6 +178,13 @@ class VeiculoController extends Portabilis_Controller_Page_EditController
             'max_length' => 15
         ];
         $this->inputsHelper()->integer('renavam', $options);
+
+        //Data Licença
+        $options = [
+            'label' => $this->_getLabel('data_licenca'),
+            'required' => false,
+        ];
+        $this->inputsHelper()->date('data_licenca', $options);
 
         //chassi
         $options = [
