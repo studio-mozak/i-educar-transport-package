@@ -25,6 +25,9 @@ return new class extends clsDetalhe {
         $this->addDetalhe(['Descrição', $registro['descricao']]);
         $this->addDetalhe(['Placa', $registro['placa']]);
         $this->addDetalhe(['Renavam', $registro['renavam']]);
+        if (trim($registro['data_licenca'])!='') {
+            $this->addDetalhe(['Data de licença', Portabilis_Date_Utils::pgSQLToBr($registro['data_licenca']) ]);
+        }
         $this->addDetalhe(['Chassi', $registro['chassi']]);
         $this->addDetalhe(['Marca', $registro['marca']]);
         $this->addDetalhe(['Ano fabricação', $registro['ano_fabricacao']]);

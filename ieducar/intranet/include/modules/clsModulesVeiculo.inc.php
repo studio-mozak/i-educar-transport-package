@@ -8,6 +8,7 @@ class clsModulesVeiculo extends Model
     public $descricao;
     public $placa;
     public $renavam;
+    public $data_licenca;
     public $chassi;
     public $marca;
     public $ano_fabricacao;
@@ -41,7 +42,8 @@ class clsModulesVeiculo extends Model
         $descricao_inativo = null,
         $ref_cod_empresa_transporte_escolar = null,
         $ref_cod_motorista = null,
-        $observacao = null
+        $observacao = null,
+        $data_licenca = null
     ) {
 
         $this->_schema = 'modules.';
@@ -50,7 +52,7 @@ class clsModulesVeiculo extends Model
         $this->_campos_lista = $this->_todos_campos = ' cod_veiculo, descricao, placa, renavam, chassi, marca, ano_fabricacao,
        ano_modelo, passageiros, malha, ref_cod_tipo_veiculo, exclusivo_transporte_escolar,
        adaptado_necessidades_especiais, ativo, descricao_inativo, ref_cod_empresa_transporte_escolar,
-       ref_cod_motorista, observacao';
+       ref_cod_motorista, observacao, data_licenca';
 
         if (is_numeric($cod_veiculo)) {
             $this->cod_veiculo = $cod_veiculo;
@@ -119,6 +121,10 @@ class clsModulesVeiculo extends Model
         if (is_string($observacao)) {
             $this->observacao = $observacao;
         }
+
+        if (is_string($data_licenca)) {
+            $this->data_licenca = $data_licenca;
+        }
     }
 
     /**
@@ -159,6 +165,12 @@ class clsModulesVeiculo extends Model
             if (is_string($this->renavam)) {
                 $campos .= "{$gruda}renavam";
                 $valores .= "{$gruda}'{$this->renavam}'";
+                $gruda = ', ';
+            }
+
+            if (is_string($this->data_licenca) && trim($this->data_licenca) != '') {
+                $campos .= "{$gruda}data_licenca";
+                $valores .= "{$gruda}'{$this->data_licenca}'";
                 $gruda = ', ';
             }
 
@@ -353,6 +365,14 @@ class clsModulesVeiculo extends Model
                 $gruda = ', ';
             } else {
                 $set .= "{$gruda}ref_cod_motorista = NULL ";
+                $gruda = ', ';
+            }
+
+            if (is_string($this->data_licenca) && trim($this->data_licenca) != '') {
+                $set .= "{$gruda}data_licenca = '{$this->data_licenca}'";
+                $gruda = ', ';
+            } else {
+                $set .= "{$gruda}data_licenca = NULL ";
                 $gruda = ', ';
             }
 

@@ -30,6 +30,7 @@ class VeiculoController extends ApiCoreController
         $veiculo->descricao = $this->getRequest()->descricao;
         $veiculo->placa = $this->getRequest()->placa;
         $veiculo->renavam = $this->getRequest()->renavam;
+        $veiculo->data_licenca = Portabilis_Date_Utils::brToPgSQL($this->getRequest()->data_licenca);
         $veiculo->chassi = $this->getRequest()->chassi;
         $veiculo->marca = $this->getRequest()->marca;
         $veiculo->passageiros = $this->getRequest()->passageiros;
@@ -127,6 +128,7 @@ class VeiculoController extends ApiCoreController
             'descricao' => 'descricao',
             'placa' => 'placa',
             'renavam' => 'renavam',
+            'data_licenca' => 'data_licenca',
             'chassi' => 'chassi',
             'marca' => 'marca',
             'ano_fabricacao' => 'ano_fabricacao',
@@ -153,6 +155,7 @@ class VeiculoController extends ApiCoreController
         $veiculo['chassi'] = Portabilis_String_Utils::toUtf8($veiculo['chassi']);
         $veiculo['descricao_inativo'] = Portabilis_String_Utils::toUtf8($veiculo['descricao_inativo']);
         $veiculo['observacao'] = Portabilis_String_Utils::toUtf8($veiculo['observacao']);
+        $veiculo['data_licenca'] = Portabilis_Date_Utils::pgSQLToBr($veiculo['data_licenca']);
 
         return $veiculo;
     }
