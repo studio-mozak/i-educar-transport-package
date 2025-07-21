@@ -1,8 +1,10 @@
 <?php
 
-use Illuminate\Support\Facades\DB;
+use clsModulesEmpresaTransporteEscolar;
+use clsModulesMotorista;
+use clsModulesVeiculo;
 
-return new class extends clsListagem 
+return new class extends clsListagem
 
 {
     private $totalEmpresas;
@@ -18,29 +20,23 @@ return new class extends clsListagem
 
     private function getTotalEmpresas(): int
     {
-        
-        $query = DB::table('modules.empresa_transporte_escolar');
+        $empresa = new clsModulesEmpresaTransporteEscolar();
 
-        
-        return $query->count();
+        return $empresa->count();
     }
 
     private function getTotalMotoristas(): int
     {
-        
-        $query = DB::table('modules.motorista');
+        $motorista = new clsModulesMotorista();
 
-        
-        return $query->count();
+        return $motorista->count();
     }
 
     private function getTotalVeiculos(): int
     {
-        
-        $query = DB::table('modules.veiculo');
+        $veiculo = new clsModulesVeiculo();
 
-        
-        return $query->count();
+        return $veiculo->count();
     }
 
     public function RenderHTML()
@@ -51,7 +47,7 @@ return new class extends clsListagem
                 '/intranet/educar_transporte_escolar_index.php' => 'Transporte Escolar'
             ]
         );
-        
+
         return '            
             <h1 class="title_ensinus">Módulo <strong>Transporte Escolar</strong></h1>
             <div>
