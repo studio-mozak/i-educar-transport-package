@@ -283,4 +283,9 @@ class clsModulesEmpresaTransporteEscolar extends Model
 
         return false;
     }
+
+    public function count() {
+        $this->lista();
+        return $this->_total;
+    }
 }

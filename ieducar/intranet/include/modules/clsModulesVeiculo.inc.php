@@ -570,4 +570,9 @@ class clsModulesVeiculo extends Model
 
         return false;
     }
+
+    public function count(): int {
+        $this->lista();
+        return $this->_total;
+    }
 }
