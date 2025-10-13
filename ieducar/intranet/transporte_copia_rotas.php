@@ -20,6 +20,7 @@ return new class extends clsCadastro {
 
     public function Gerar()
     {
+        $this->_titulo = 'Cópia de - rotas';
         $empresas = [ '' => 'Selecione' ];
         $anos_origem = [ '' => 'Selecione' ];
         $objTemp = new clsModulesEmpresaTransporteEscolar();
