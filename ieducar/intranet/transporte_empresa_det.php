@@ -60,7 +60,6 @@ return new class extends clsDetalhe {
         if ($obj_permissao->permissao_cadastra(21235, $this->pessoa_logada, 7, null, true)) {
             $this->url_novo = '../module/TransporteEscolar/Empresa';
         }
-
         if ($obj_permissao->permissao_editar(21235, $this->pessoa_logada, 7, null, true)) {
             $this->url_editar = "../module/TransporteEscolar/Empresa?id={$cod_empresa_transporte_escolar}";
         }
