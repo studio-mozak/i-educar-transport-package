@@ -129,7 +129,7 @@ return new class extends clsCadastro {
     public function Editar()
     {
         $obj_permissoes = new clsPermissoes();
-        $obj_permissoes->permissao_cadastra(21238, $this->pessoa_logada, 7, "transporte_rota_det.php?cod_rota={$this->cod_rota}");
+        $obj_permissoes->permissao_editar(21238, $this->pessoa_logada, 7, "transporte_rota_det.php?cod_rota={$this->cod_rota}");
 
         if ($this->ref_cod_ponto_transporte_escolar) {
             $obj  = new clsModulesItinerarioTransporteEscolar();
