@@ -111,6 +111,8 @@ return new class extends clsDetalhe {
 
         if ($obj_permissao->permissao_cadastra(21238, $this->pessoa_logada, 7, null, true)) {
             $this->url_novo = '../module/TransporteEscolar/Rota';
+        }
+        if ($obj_permissao->permissao_editar(21238, $this->pessoa_logada, 7, null, true)) {
             $this->url_editar = "../module/TransporteEscolar/Rota?id={$cod_rota_transporte_escolar}";
         }
 
