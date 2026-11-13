@@ -59,6 +59,7 @@ return new class extends clsListagem {
         $this->addCabecalhos([
             'Código',
             'Nome da pessoa',
+            'Ano',
             'Rota',
             'Destino',
             'Ponto de embarque'
@@ -79,6 +80,7 @@ return new class extends clsListagem {
             $this->addLinhas([
                 "<a href=\"transporte_pessoa_det.php?cod_pt={$registro['cod_pessoa_transporte']}\">{$registro['cod_pessoa_transporte']}</a>",
                 "<a href=\"transporte_pessoa_det.php?cod_pt={$registro['cod_pessoa_transporte']}\">{$registro['nome_pessoa']}</a>",
+                "<a href=\"transporte_pessoa_det.php?cod_pt={$registro['cod_pessoa_transporte']}\">{$registro['ano']}</a>",
                 "<a href=\"transporte_pessoa_det.php?cod_pt={$registro['cod_pessoa_transporte']}\">{$registro['nome_rota']}</a>",
                 "<a href=\"transporte_pessoa_det.php?cod_pt={$registro['cod_pessoa_transporte']}\">".(trim($registro['nome_destino'])=='' ? $registro['nome_destino2'] : $registro['nome_destino']).'</a>',
                 "<a href=\"transporte_pessoa_det.php?cod_pt={$registro['cod_pessoa_transporte']}\">{$registro['nome_ponto']}</a>"

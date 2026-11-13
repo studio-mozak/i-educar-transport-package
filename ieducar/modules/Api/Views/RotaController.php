@@ -88,12 +88,33 @@ class RotaController extends ApiCoreController
         return $rota;
     }
 
+    protected function routeHasUsers($routeId)
+    {
+        if (!is_numeric($routeId)) {
+            return false;
+        }
+
+        $lista = (new clsModulesPessoaTransporte())->lista(null, null, $routeId);
+
+        return is_array($lista) && count($lista) > 0;
+    }
+
+    protected function validatesYearIsNotChangedWhenRouteHasUsers($routeId)
+    {
+        $route = (new clsModulesRotaTransporteEscolar($routeId))->detalhe();
+
+        if (empty($route) || (string) $route['ano'] === (string) $this->getRequest()->ano || !$this->routeHasUsers($routeId)) {
+            return true;
+        }
+
+        $this->messenger->append('Não é possível alterar o ano de uma rota com usuários vinculados.');
+
+        return false;
+    }
+
     protected function validateIfRotaIsNotInUse()
     {
-        $pt = new clsModulesPessoaTransporte();
-        $lista = $pt->lista(null, null, $this->getRequest()->id);
-
-        if (is_array($lista) && count($lista)>0) {
+        if ($this->routeHasUsers($this->getRequest()->id)) {
             $this->messenger->append(
                 'Não é possível excluir uma rota que está vinculada a uma pessoa.',
                 'error',
@@ -127,6 +148,11 @@ class RotaController extends ApiCoreController
     protected function put()
     {
         $id = $this->getRequest()->id;
+
+        if (!$this->validatesYearIsNotChangedWhenRouteHasUsers($id)) {
+            return ['id' => $id];
+        }
+
         $editou = $this->createOrUpdateRota($id);
 
         if ($editou) {

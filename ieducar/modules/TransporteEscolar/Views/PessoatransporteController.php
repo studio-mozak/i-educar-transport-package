@@ -25,6 +25,10 @@ class PessoatransporteController extends Portabilis_Controller_Page_EditControll
             'label' => 'Rota',
             'help' => '',
         ],
+        'ano' => [
+            'label' => 'Ano letivo',
+            'help' => '',
+        ],
         'ponto' => [
             'label' => 'Ponto de embarque',
             'help' => '',
@@ -99,6 +103,15 @@ class PessoatransporteController extends Portabilis_Controller_Page_EditControll
             'resources' => $rota_resources
         ];
         $this->inputsHelper()->select('rota', $options);
+
+        $this->inputsHelper()->text('ano', [
+            'label' => $this->_getLabel('ano'),
+            'value' => '-',
+            'disabled' => true,
+            'required' => false,
+            'size' => 5,
+            'max_length' => 4,
+        ]);
 
         // Ponto de Embarque
         $options = [
