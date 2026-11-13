@@ -33,6 +33,7 @@ class VeiculoController extends ApiCoreController
         $veiculo->data_licenca = Portabilis_Date_Utils::brToPgSQL($this->getRequest()->data_licenca);
         $veiculo->chassi = $this->getRequest()->chassi;
         $veiculo->marca = $this->getRequest()->marca;
+        $veiculo->modelo = $this->getRequest()->modelo;
         $veiculo->passageiros = $this->getRequest()->passageiros;
         $veiculo->ano_fabricacao = $this->getRequest()->ano_fabricacao;
         $veiculo->ano_modelo = $this->getRequest()->ano_modelo;
@@ -40,6 +41,7 @@ class VeiculoController extends ApiCoreController
         $veiculo->ref_cod_tipo_veiculo = $this->getRequest()->tipo;
         $veiculo->exclusivo_transporte_escolar = ($this->getRequest()->exclusivo_transporte_escolar == 'on' ? 'S' : 'N');
         $veiculo->adaptado_necessidades_especiais = ($this->getRequest()->adaptado_necessidades_especiais == 'on' ? 'S' : 'N');
+        $veiculo->terceirizado = ($this->getRequest()->terceirizado == 'on' ? 'S' : 'N');
         $veiculo->ativo = ($this->getRequest()->ativo == 'on' ? 'S' : 'N');
         $veiculo->descricao_inativo = $this->getRequest()->descricao_inativo;
         $veiculo->ref_cod_empresa_transporte_escolar = $this->getRequest()->empresa_id;
@@ -131,6 +133,7 @@ class VeiculoController extends ApiCoreController
             'data_licenca' => 'data_licenca',
             'chassi' => 'chassi',
             'marca' => 'marca',
+            'modelo' => 'modelo',
             'ano_fabricacao' => 'ano_fabricacao',
             'ano_modelo' => 'ano_modelo',
             'passageiros' => 'passageiros',
@@ -138,6 +141,7 @@ class VeiculoController extends ApiCoreController
             'ref_cod_tipo_veiculo' => 'tipo',
             'exclusivo_transporte_escolar' => 'exclusivo_transporte_escolar',
             'adaptado_necessidades_especiais' => 'adaptado_necessidades_especiais',
+            'terceirizado' => 'terceirizado',
             'ativo' => 'ativo',
             'descricao_inativo' => 'descricao_inativo',
             'ref_cod_empresa_transporte_escolar' => 'empresa',
@@ -151,6 +155,7 @@ class VeiculoController extends ApiCoreController
         $veiculo['motoristaNome'] = Portabilis_String_Utils::toUtf8($this->loadNomeMotorista($veiculo['motorista']));
         $veiculo['descricao'] = Portabilis_String_Utils::toUtf8($veiculo['descricao']);
         $veiculo['marca'] = Portabilis_String_Utils::toUtf8($veiculo['marca']);
+        $veiculo['modelo'] = Portabilis_String_Utils::toUtf8($veiculo['modelo']);
         $veiculo['placa'] = Portabilis_String_Utils::toUtf8($veiculo['placa']);
         $veiculo['chassi'] = Portabilis_String_Utils::toUtf8($veiculo['chassi']);
         $veiculo['descricao_inativo'] = Portabilis_String_Utils::toUtf8($veiculo['descricao_inativo']);

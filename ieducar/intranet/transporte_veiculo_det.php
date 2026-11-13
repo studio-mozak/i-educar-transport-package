@@ -1,5 +1,8 @@
 <?php
 
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+
 return new class extends clsDetalhe {
     public $titulo;
 
@@ -30,6 +33,7 @@ return new class extends clsDetalhe {
         }
         $this->addDetalhe(['Chassi', $registro['chassi']]);
         $this->addDetalhe(['Marca', $registro['marca']]);
+        $this->addDetalhe(['Modelo', trim((string) $registro['modelo']) !== '' ? e($registro['modelo']) : '-']);
         $this->addDetalhe(['Ano fabricação', $registro['ano_fabricacao']]);
         $this->addDetalhe(['Ano modelo', $registro['ano_modelo']]);
         $this->addDetalhe(['Limite de passageiros', $registro['passageiros']]);
@@ -49,6 +53,7 @@ return new class extends clsDetalhe {
         $this->addDetalhe(['Categoria', $registro['descricao_tipo']]);
         $this->addDetalhe(['Exclusivo para transporte escolar', ($registro['exclusivo_transporte_escolar'] == 'S' ? 'Sim' : 'Não')]);
         $this->addDetalhe(['Adaptado para pessoas com necessidades especiais', ($registro['adaptado_necessidades_especiais'] == 'S' ? 'Sim' : 'Não')]);
+        $this->addDetalhe(['Terceirizado', ($registro['terceirizado'] == 'S' ? 'Sim' : 'Não')]);
         $this->addDetalhe(['Ativo', ($registro['ativo'] == 'S' ? 'Sim' : 'Não')]);
         if ($registro['ativo']=='N') {
             $this->addDetalhe(['Descrição inativo', $registro['descricao_inativo']]);
@@ -56,6 +61,7 @@ return new class extends clsDetalhe {
         $this->addDetalhe(['Empresa', $registro['nome_empresa']]);
         $this->addDetalhe(['Motorista responsável', $registro['nome_motorista']]);
         $this->addDetalhe(['Observação', $registro['observacao']]);
+        $this->addDetalhe(['Itinerários', $this->routesTable($this->vehicleRoutes($cod_veiculo))]);
         $this->url_cancelar = 'transporte_veiculo_lst.php';
 
         $this->largura = '100%';
@@ -72,6 +78,46 @@ return new class extends clsDetalhe {
         $this->breadcrumb('Detalhe do veículo', [
         url('intranet/educar_transporte_escolar_index.php') => 'Transporte escolar',
     ]);
+    }
+
+    private function vehicleRoutes($vehicleId): Collection
+    {
+        return DB::table('modules.itinerario_transporte_escolar as itinerary')
+            ->join('modules.rota_transporte_escolar as route', 'route.cod_rota_transporte_escolar', '=', 'itinerary.ref_cod_rota_transporte_escolar')
+            ->where('itinerary.ref_cod_veiculo', $vehicleId)
+            ->distinct()
+            ->orderByDesc('route.ano')
+            ->orderBy('route.descricao')
+            ->orderBy('route.cod_rota_transporte_escolar')
+            ->orderBy('itinerary.tipo')
+            ->get([
+                'route.cod_rota_transporte_escolar as route_id',
+                'route.ano as year',
+                'route.descricao as route_name',
+                'itinerary.tipo as direction',
+            ]);
+    }
+
+    private function routesTable(Collection $routes): string
+    {
+        if ($routes->isEmpty()) {
+            return 'Veículo não utilizado em nenhum itinerário.';
+        }
+
+        $rows = $routes->values()->map(function ($route, $index) {
+            $color = $index % 2 === 0 ? ' bgcolor="#f5f9fd" ' : ' bgcolor="#FFFFFF" ';
+
+            return sprintf(
+                '<tr><td %1$s align=left>%2$s</td><td %1$s align=left>%3$s</td><td %1$s align=left>%4$s</td><td %1$s align=left><a style="text-decoration: underline;" href="/intranet/transporte_itinerario_cad.php?cod_rota=%5$d">Editar itinerário</a></td></tr>',
+                $color,
+                $route->year,
+                e($route->route_name),
+                $route->direction === 'V' ? 'Volta' : 'Ida',
+                $route->route_id
+            );
+        })->implode('');
+
+        return '<div style="width: 0; min-width: 100%; overflow-x: auto;"><table><tr align="center"><td bgcolor="#ccdce6"><b>Ano</b></td><td bgcolor="#ccdce6"><b>Rota</b></td><td bgcolor="#ccdce6"><b>Sentido</b></td><td bgcolor="#ccdce6"></td></tr>' . $rows . '</table></div>';
     }
 
     public function Formular()

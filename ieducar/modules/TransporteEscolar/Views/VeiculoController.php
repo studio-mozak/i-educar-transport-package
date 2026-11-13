@@ -3,7 +3,7 @@
 class VeiculoController extends Portabilis_Controller_Page_EditController
 {
     protected $_dataMapper = 'Usuario_Model_FuncionarioDataMapper';
-    protected $_titulo = 'Ensinus - Motoristas';
+    protected $_titulo = 'Ensinus - Veículos';
 
     protected $_nivelAcessoOption = App_Model_NivelAcesso::SOMENTE_ESCOLA;
     protected $_processoAp = 21237;
@@ -45,6 +45,11 @@ class VeiculoController extends Portabilis_Controller_Page_EditController
             'help' => '',
         ],
 
+        'modelo' => [
+            'label' => 'Modelo',
+            'help' => '',
+        ],
+
         'ano_fabricacao' => [
             'label' => 'Ano fabricação',
             'help' => '',
@@ -70,11 +75,6 @@ class VeiculoController extends Portabilis_Controller_Page_EditController
             'help' => '',
         ],
 
-        'abrangencia' => [
-            'label' => 'Abrangência',
-            'help' => '',
-        ],
-
         'exclusivo_transporte_escolar' => [
             'label' => 'Exclusivo para transporte escolar',
             'help' => '',
@@ -85,8 +85,8 @@ class VeiculoController extends Portabilis_Controller_Page_EditController
             'help' => '',
         ],
 
-        'tercerizado' => [
-            'label' => 'Tercerizado',
+        'terceirizado' => [
+            'label' => 'Terceirizado',
             'help' => '',
         ],
 
@@ -204,6 +204,14 @@ class VeiculoController extends Portabilis_Controller_Page_EditController
         ];
         $this->inputsHelper()->text('marca', $options);
 
+        $options = [
+            'label' => $this->_getLabel('modelo'),
+            'required' => false,
+            'size' => 50,
+            'max_length' => 50
+        ];
+        $this->inputsHelper()->text('modelo', $options);
+
         //Ano de fabricacao
         $options = [
             'label' => $this->_getLabel('ano_fabricacao'),
@@ -275,6 +283,9 @@ class VeiculoController extends Portabilis_Controller_Page_EditController
         // Adaptado a necessidades especiais
         $options = ['label' => $this->_getLabel('adaptado_necessidades_especiais')];
         $this->inputsHelper()->checkbox('adaptado_necessidades_especiais', $options);
+
+        $options = ['label' => $this->_getLabel('terceirizado')];
+        $this->inputsHelper()->checkbox('terceirizado', $options);
 
         // Ativo
         $options = ['label' => $this->_getLabel('ativo'), 'value' => 'on'];
