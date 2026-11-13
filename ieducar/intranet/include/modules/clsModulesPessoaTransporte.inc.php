@@ -11,6 +11,7 @@ class clsModulesPessoaTransporte extends Model
     public $ref_idpes_destino;
     public $observacao;
     public $turno;
+    public $ano;
 
     /**
      * Construtor.
@@ -22,14 +23,15 @@ class clsModulesPessoaTransporte extends Model
         $ref_cod_ponto_transporte_escolar = null,
         $ref_idpes_destino = null,
         $observacao = null,
-        $turno = null
+        $turno = null,
+        $ano = null
     ) {
 
         $this->_schema = 'modules.';
         $this->_tabela = "{$this->_schema}pessoa_transporte";
 
         $this->_campos_lista = $this->_todos_campos = 'cod_pessoa_transporte, ref_cod_rota_transporte_escolar,
-                                                  ref_idpes, ref_cod_ponto_transporte_escolar, ref_idpes_destino, observacao, turno';
+                                                  ref_idpes, ref_cod_ponto_transporte_escolar, ref_idpes_destino, observacao, turno, ano';
 
         if (is_numeric($cod_pessoa_transporte)) {
             $this->cod_pessoa_transporte = $cod_pessoa_transporte;
@@ -58,6 +60,10 @@ class clsModulesPessoaTransporte extends Model
         if (is_numeric($turno)) {
             $this->turno = $turno;
         }
+
+        if (is_numeric($ano)) {
+            $this->ano = $ano;
+        }
     }
 
     /**
@@ -67,7 +73,7 @@ class clsModulesPessoaTransporte extends Model
      */
     public function cadastra()
     {
-        if (is_numeric($this->ref_idpes) && is_numeric($this->ref_cod_rota_transporte_escolar)) {
+        if (is_numeric($this->ref_idpes) && is_numeric($this->ref_cod_rota_transporte_escolar) && is_numeric($this->ano)) {
             $db = new clsBanco();
             $campos = '';
             $valores = '';
@@ -116,6 +122,9 @@ class clsModulesPessoaTransporte extends Model
                 $gruda = ', ';
             }
 
+            $campos .= "{$gruda}ano";
+            $valores .= "{$gruda}'{$this->ano}'";
+
             $db->Consulta("INSERT INTO {$this->_tabela} ( $campos ) VALUES( $valores )");
 
             $this->cod_pessoa_transporte = $db->InsertId("{$this->_tabela}_seq");
@@ -155,7 +164,7 @@ class clsModulesPessoaTransporte extends Model
             if (is_numeric($this->ref_cod_ponto_transporte_escolar)) {
                 $set .= "{$gruda}ref_cod_ponto_transporte_escolar = '{$this->ref_cod_ponto_transporte_escolar}'";
                 $gruda = ', ';
-            } else {
+            } elseif ($this->ref_cod_ponto_transporte_escolar === '') {
                 $set .= "{$gruda}ref_cod_ponto_transporte_escolar = null";
                 $gruda = ', ';
             }
@@ -163,7 +172,7 @@ class clsModulesPessoaTransporte extends Model
             if (is_numeric($this->ref_idpes_destino)) {
                 $set .= "{$gruda}ref_idpes_destino = '{$this->ref_idpes_destino}'";
                 $gruda = ', ';
-            } else {
+            } elseif ($this->ref_idpes_destino === '') {
                 $set .= "{$gruda}ref_idpes_destino = null";
                 $gruda = ', ';
             }
@@ -176,6 +185,11 @@ class clsModulesPessoaTransporte extends Model
 
             if (is_numeric($this->turno)) {
                 $set .= "{$gruda}turno = '{$this->turno}'";
+                $gruda = ', ';
+            }
+
+            if (is_numeric($this->ano)) {
+                $set .= "{$gruda}ano = '{$this->ano}'";
                 $gruda = ', ';
             }
 
@@ -214,6 +228,7 @@ class clsModulesPessoaTransporte extends Model
                    pt.ref_idpes_destino,
                    pt.observacao,
                    pt.turno,
+                   pt.ano,
                    pd.nome AS nome_destino,
                    p.nome AS nome_pessoa,
                    rte.descricao AS nome_rota,
@@ -244,27 +259,27 @@ class clsModulesPessoaTransporte extends Model
         $whereAnd = ' WHERE ';
         $whereNomes = '';
         if (is_numeric($cod_pessoa_transporte)) {
-            $filtros .= "{$whereAnd} cod_pessoa_transporte = '{$cod_pessoa_transporte}'";
+            $filtros .= "{$whereAnd} pt.cod_pessoa_transporte = '{$cod_pessoa_transporte}'";
             $whereAnd = ' AND ';
         }
 
         if (is_numeric($ref_idpes)) {
-            $filtros .= "{$whereAnd} ref_idpes = '{$ref_idpes}'";
+            $filtros .= "{$whereAnd} pt.ref_idpes = '{$ref_idpes}'";
             $whereAnd = ' AND ';
         }
 
         if (is_numeric($ref_cod_rota_transporte_escolar)) {
-            $filtros .= "{$whereAnd} ref_cod_rota_transporte_escolar = '{$ref_cod_rota_transporte_escolar}'";
+            $filtros .= "{$whereAnd} pt.ref_cod_rota_transporte_escolar = '{$ref_cod_rota_transporte_escolar}'";
             $whereAnd = ' AND ';
         }
 
         if (is_numeric($ref_cod_ponto_transporte_escolar)) {
-            $filtros .= "{$whereAnd} ref_cod_ponto_transporte_escolar = '{$ref_cod_ponto_transporte_escolar}'";
+            $filtros .= "{$whereAnd} pt.ref_cod_ponto_transporte_escolar = '{$ref_cod_ponto_transporte_escolar}'";
             $whereAnd = ' AND ';
         }
 
         if (is_numeric($ref_idpes_destino)) {
-            $filtros .= "{$whereAnd} ref_idpes_destino = '{$ref_idpes_destino}'";
+            $filtros .= "{$whereAnd} pt.ref_idpes_destino = '{$ref_idpes_destino}'";
             $whereAnd = ' AND ';
         }
 
@@ -276,12 +291,12 @@ class clsModulesPessoaTransporte extends Model
 
         if (is_string($nome_destino)) {
             $nm_destino = $db->escapeString($nome_destino);
-            $filtros .= "{$whereAnd} unaccent(pd.nome) ILIKE unaccent('%{$nm_destino}%') OR unaccent(pd2.nome) ILIKE unaccent('%{$nm_destino}%')";
+            $filtros .= "{$whereAnd} (unaccent(pd.nome) ILIKE unaccent('%{$nm_destino}%') OR unaccent(pd2.nome) ILIKE unaccent('%{$nm_destino}%'))";
             $whereAnd = ' AND ';
         }
 
         if (is_numeric($ano_rota)) {
-            $filtros .= "{$whereAnd} rte.ano = '{$ano_rota}'";
+            $filtros .= "{$whereAnd} pt.ano = '{$ano_rota}'";
             $whereAnd = ' AND ';
         }
 
@@ -365,6 +380,8 @@ class clsModulesPessoaTransporte extends Model
 
             if (is_numeric($this->cod_pessoa_transporte)) {
                 $sql .= " cod_pessoa_transporte = '{$this->cod_pessoa_transporte}'";
+            } elseif (is_numeric($this->ano)) {
+                $sql .= " ref_idpes = '{$this->ref_idpes}' AND ano = '{$this->ano}'";
             } else {
                 $sql .= " ref_idpes = '{$this->ref_idpes}' ORDER BY cod_pessoa_transporte DESC LIMIT 1 ";
             }
