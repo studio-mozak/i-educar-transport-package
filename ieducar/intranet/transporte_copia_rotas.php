@@ -139,6 +139,13 @@ return new class extends clsCadastro {
                         $valores .= "{$gruda}'{$registro['tercerizado']}'";
                         $gruda = ', ';
                     }
+                    foreach (['abrangencia', 'dias_semana'] as $column) {
+                        if (is_string($registro[$column])) {
+                            $campos .= "{$gruda}{$column}";
+                            $valores .= "{$gruda}'{$db->escapeString($registro[$column])}'";
+                            $gruda = ', ';
+                        }
+                    }
 
                     $db->Consulta("INSERT INTO {$this->_tabela} ( $campos ) VALUES( $valores )");
 

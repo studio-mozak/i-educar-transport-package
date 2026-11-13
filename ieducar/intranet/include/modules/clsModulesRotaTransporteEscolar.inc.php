@@ -1,9 +1,27 @@
 <?php
 
+use App\Models\Enums\DayOfWeek;
 use iEducar\Legacy\Model;
 
 class clsModulesRotaTransporteEscolar extends Model
 {
+    public const COVERAGES = [
+        'M' => 'Municipal',
+        'I' => 'Intermunicipal',
+    ];
+
+    public const WEEKDAYS_IN_SCREEN_ORDER = [
+        DayOfWeek::MONDAY,
+        DayOfWeek::TUESDAY,
+        DayOfWeek::WEDNESDAY,
+        DayOfWeek::THURSDAY,
+        DayOfWeek::FRIDAY,
+        DayOfWeek::SATURDAY,
+        DayOfWeek::SUNDAY,
+    ];
+
+    public const NOT_INFORMED = 'Não informado';
+
     public $cod_rota_transporte_escolar;
     public $ref_idpes_destino;
     public $descricao;
@@ -13,14 +31,16 @@ class clsModulesRotaTransporteEscolar extends Model
     public $km_npav;
     public $ref_cod_empresa_transporte_escolar;
     public $tercerizado;
+    public $abrangencia;
+    public $dias_semana;
 
-    public function __construct($cod_rota_transporte_escolar = null, $ref_idpes_destino = null, $descricao = null, $ano = null, $tipo_rota = null, $km_pav = null, $km_npav = null, $ref_cod_empresa_transporte_escolar = null, $tercerizado = null)
+    public function __construct($cod_rota_transporte_escolar = null, $ref_idpes_destino = null, $descricao = null, $ano = null, $tipo_rota = null, $km_pav = null, $km_npav = null, $ref_cod_empresa_transporte_escolar = null, $tercerizado = null, $abrangencia = null, $dias_semana = null)
     {
 
         $this->_schema = 'modules.';
         $this->_tabela = "{$this->_schema}rota_transporte_escolar";
 
-        $this->_campos_lista = $this->_todos_campos = ' cod_rota_transporte_escolar, ref_idpes_destino, descricao, ano, tipo_rota, km_pav, km_npav, ref_cod_empresa_transporte_escolar, tercerizado';
+        $this->_campos_lista = $this->_todos_campos = ' cod_rota_transporte_escolar, ref_idpes_destino, descricao, ano, tipo_rota, km_pav, km_npav, ref_cod_empresa_transporte_escolar, tercerizado, abrangencia, dias_semana';
 
         if (is_numeric($cod_rota_transporte_escolar)) {
             $this->cod_rota_transporte_escolar = $cod_rota_transporte_escolar;
@@ -57,6 +77,90 @@ class clsModulesRotaTransporteEscolar extends Model
         if (is_string($tercerizado)) {
             $this->tercerizado = $tercerizado;
         }
+
+        if (is_string($abrangencia)) {
+            $this->abrangencia = $abrangencia;
+        }
+
+        if (is_string($dias_semana)) {
+            $this->dias_semana = $dias_semana;
+        }
+    }
+
+    public static function isValidCoverage($coverage): bool
+    {
+        return $coverage === null || $coverage === '' || (is_string($coverage) && array_key_exists($coverage, self::COVERAGES));
+    }
+
+    public static function weekdaysFromInput($weekdays): ?array
+    {
+        if ($weekdays === null || $weekdays === '') {
+            return [];
+        }
+
+        if (!is_array($weekdays)) {
+            return null;
+        }
+
+        $days = [];
+
+        foreach ($weekdays as $day) {
+            if (!is_scalar($day) || !ctype_digit((string) $day) || DayOfWeek::tryFrom((int) $day) === null) {
+                return null;
+            }
+
+            $days[] = (int) $day;
+        }
+
+        $days = array_unique($days);
+        sort($days);
+
+        return $days;
+    }
+
+    public static function weekdaysFromColumn($weekdays): array
+    {
+        if (!is_string($weekdays) || trim($weekdays) === '') {
+            return [];
+        }
+
+        return self::weekdaysFromInput(explode(',', $weekdays)) ?? [];
+    }
+
+    public static function coverageName($coverage): string
+    {
+        return self::COVERAGES[$coverage] ?? self::NOT_INFORMED;
+    }
+
+    public static function weekdaysNames($weekdays): string
+    {
+        $days = self::weekdaysFromColumn($weekdays);
+        $names = [];
+
+        foreach (self::WEEKDAYS_IN_SCREEN_ORDER as $day) {
+            if (in_array($day->value, $days, true)) {
+                $names[] = $day->shortName();
+            }
+        }
+
+        return empty($names) ? self::NOT_INFORMED : implode(', ', $names);
+    }
+
+    public function updateCoverageAndWeekdays($coverage, $weekdays): bool
+    {
+        $days = self::weekdaysFromInput($weekdays);
+
+        if (!is_numeric($this->cod_rota_transporte_escolar) || !self::isValidCoverage($coverage) || $days === null) {
+            return false;
+        }
+
+        $coverageValue = empty($coverage) ? 'NULL' : "'{$coverage}'";
+        $weekdaysValue = empty($days) ? 'NULL' : "'" . implode(',', $days) . "'";
+
+        $db = new clsBanco();
+        $db->Consulta("UPDATE {$this->_tabela} SET abrangencia = {$coverageValue}, dias_semana = {$weekdaysValue} WHERE cod_rota_transporte_escolar = '{$this->cod_rota_transporte_escolar}'");
+
+        return true;
     }
 
     /**
@@ -124,6 +228,20 @@ class clsModulesRotaTransporteEscolar extends Model
                 $gruda = ', ';
             }
 
+            if (is_string($this->abrangencia)) {
+                $coverage = $db->escapeString($this->abrangencia);
+                $campos .= "{$gruda}abrangencia";
+                $valores .= "{$gruda}'{$coverage}'";
+                $gruda = ', ';
+            }
+
+            if (is_string($this->dias_semana)) {
+                $weekdays = $db->escapeString($this->dias_semana);
+                $campos .= "{$gruda}dias_semana";
+                $valores .= "{$gruda}'{$weekdays}'";
+                $gruda = ', ';
+            }
+
             $db->Consulta("INSERT INTO {$this->_tabela} ( $campos ) VALUES( $valores )");
 
             $this->cod_rota_transporte_escolar = $db->InsertId("{$this->_tabela}_seq");
@@ -188,6 +306,18 @@ class clsModulesRotaTransporteEscolar extends Model
 
             if (is_string($this->tercerizado)) {
                 $set .= "{$gruda}tercerizado = '{$this->tercerizado}'";
+                $gruda = ', ';
+            }
+
+            if (is_string($this->abrangencia)) {
+                $coverage = $db->escapeString($this->abrangencia);
+                $set .= "{$gruda}abrangencia = '{$coverage}'";
+                $gruda = ', ';
+            }
+
+            if (is_string($this->dias_semana)) {
+                $weekdays = $db->escapeString($this->dias_semana);
+                $set .= "{$gruda}dias_semana = '{$weekdays}'";
                 $gruda = ', ';
             }
 
