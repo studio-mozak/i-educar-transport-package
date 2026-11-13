@@ -27,6 +27,8 @@ return new class extends clsDetalhe {
         $this->addDetalhe(['Destino', $registro['nome_destino']]);
         $this->addDetalhe(['Empresa', $registro['nome_empresa']]);
         $this->addDetalhe(['Tipo da rota', ($registro['tipo_rota'] == 'U' ? 'Urbana' : 'Rural')]);
+        $this->addDetalhe(['Abrangência', clsModulesRotaTransporteEscolar::coverageName($registro['abrangencia'])]);
+        $this->addDetalhe(['Dias de funcionamento', clsModulesRotaTransporteEscolar::weekdaysNames($registro['dias_semana'])]);
         if (trim($registro['km_pav'])!='') {
             $this->addDetalhe(['Percurso pavimentado', $registro['km_pav'].' km']);
         }
