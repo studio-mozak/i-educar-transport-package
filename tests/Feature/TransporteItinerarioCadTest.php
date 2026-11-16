@@ -2,9 +2,11 @@
 
 namespace iEducar\Packages\Transport\Tests\Feature;
 
+use iEducar\Packages\Transport\Services\RoutePathService;
 use iEducar\Packages\Transport\Tests\CreatesItineraryRecords;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Tests\LoginFirstUser;
 use Tests\TestCase;
@@ -16,6 +18,8 @@ class TransporteItinerarioCadTest extends TestCase
     use CreatesItineraryRecords, DatabaseTransactions, LoginFirstUser, WithoutMiddleware;
 
     public const ROUTE = '/intranet/transporte_itinerario_cad.php';
+
+    public const KEY = 'page-key-ENS009';
 
     protected function setUp(): void
     {
@@ -59,7 +63,8 @@ class TransporteItinerarioCadTest extends TestCase
             '<span style="' . $wrappingRow . '">', '> Seg<', '> Qui<', '</span>',
             '<span style="' . $wrappingRow . '">', '> Sex<', '> Dom<', '</span>',
         ], false);
-        $response->assertDontSee('white-space: nowrap;', false);
+        $this->assertSame(1, preg_match('/<span role="group" aria-label="Dias de funcionamento".*?> Dom<\/label><\/span><\/span>/s', $response->getContent(), $weekdayGroup));
+        $this->assertStringNotContainsString('nowrap', $weekdayGroup[0]);
     }
 
     public function test_form_loads_the_saved_coverage_and_weekdays(): void
@@ -101,6 +106,153 @@ class TransporteItinerarioCadTest extends TestCase
             ->assertSee($stop . ' - Ponto da Gameleira ENS010', false)
             ->assertSee('id="ref_cod_veiculo[0]" value="' . $vehicle . ' - ', false)
             ->assertSee('06:30', false);
+    }
+
+    public function test_form_shows_the_route_path_block_below_the_stops_table(): void
+    {
+        config([RoutePathService::KEY_SETTING => self::KEY]);
+        $route = $this->routeRecord('Rota da Gameleira ENS009', 2026);
+        $this->itineraryStopRecord($route, 1, $this->stopRecord('Escola ENS009', ['latitude' => '-5.0912', 'longitude' => '-42.8011']), null, '06:30', 'I');
+
+        $response = $this->form($route)
+            ->assertSeeInOrder([
+                'Itinerário', 'Veículo (Requer pré-cadastro)', 'ADICIONAR NOVO',
+                '<tr id="tr_route_path"><td colspan="2" class="formlttd"><span class="form"><b>Trajeto</b></span>',
+                '<div id="route_path_map" class="transport-map route-path-map" role="region" aria-label="Mapa do trajeto da rota"></div>',
+                'route-path-outbound', ' Ida</span>', 'route-path-return', ' Volta</span>',
+                '<p id="route_path_not_calculated" class="route-path-note">Trajeto ainda não calculado.</p>',
+                '<button type="button" id="route_path_calculate" class="botaolistagem">Calcular trajeto</button>',
+                'Km ida', 'name="km_ida" id="km_ida" value=""',
+                'Km volta', 'name="km_volta" id="km_volta" value=""',
+                'Percurso pavimentado', 'name="km_pav" id="km_pav" value=""', 'km',
+                'Percurso não pavimentado', 'name="km_npav" id="km_npav" value=""', 'km',
+            ], false)
+            ->assertSee('<div id="route_path_stale" class="route-path-alert route-path-alert-notice" role="alert" hidden>' . RoutePathService::STALE_MESSAGE . '</div>', false)
+            ->assertSee('<div id="route_path_failure" class="route-path-alert route-path-alert-error" role="alert" hidden>' . RoutePathService::UNAVAILABLE_MESSAGE . '</div>', false)
+            ->assertSee('<p id="route_path_empty" class="route-path-note" hidden>', false)
+            ->assertSee("name='trajeto_ida' id='trajeto_ida' type='hidden' value=''", false)
+            ->assertSee("name='trajeto_volta' id='trajeto_volta' type='hidden' value=''", false)
+            ->assertSee("name='trajeto_hash' id='trajeto_hash' type='hidden' value=''", false)
+            ->assertSee('window.routePathMap = ', false)
+            ->assertSee('.transport-map { isolation: isolate; width: 100%; border: 1px solid #cddce6; border-radius: 3px; }', false)
+            ->assertSee('.route-path-map { height: 420px; }', false)
+            ->assertSee('window.transportMap = {', false)
+            ->assertDontSee('id="route_path_missing_key"', false);
+
+        $this->assertStringNotContainsString(self::KEY, $response->getContent());
+        $this->assertSame(1, preg_match('/<tr id="tr_route_path">.*?<\/td><\/tr>/s', $response->getContent(), $routePathRow));
+        $this->assertStringNotContainsString('flashMessages__message', $routePathRow[0]);
+    }
+
+    public function test_form_without_key_hides_the_button_and_asks_to_configure_it(): void
+    {
+        config([RoutePathService::KEY_SETTING => '']);
+        $route = $this->routeRecord('Rota da Gameleira ENS009', 2026);
+
+        $this->form($route)
+            ->assertSee('<div id="route_path_missing_key" class="route-path-alert route-path-alert-neutral" role="alert">' . RoutePathService::MISSING_KEY_MESSAGE . '</div>', false)
+            ->assertDontSee('id="route_path_calculate"', false)
+            ->assertSee('id="km_pav"', false);
+    }
+
+    public function test_form_of_an_empty_itinerary_disables_the_button(): void
+    {
+        config([RoutePathService::KEY_SETTING => self::KEY]);
+        $route = $this->routeRecord('Rota sem pontos ENS009', 2026);
+
+        $this->form($route)
+            ->assertSee('<p id="route_path_empty" class="route-path-note">' . RoutePathService::EMPTY_ITINERARY_MESSAGE . '</p>', false)
+            ->assertSee('<button type="button" id="route_path_calculate" class="botaolistagemdisabled" disabled>Calcular trajeto</button>', false);
+    }
+
+    public function test_form_lists_the_stops_without_coordinates_with_a_link_to_each_one(): void
+    {
+        config([RoutePathService::KEY_SETTING => self::KEY]);
+        $route = $this->routeRecord('Rota do Açude ENS009', 2026);
+        $dam = $this->stopRecord('Açude ENS009');
+        $this->itineraryStopRecord($route, 1, $dam, null, '06:30', 'I');
+        $this->itineraryStopRecord($route, 2, $this->stopRecord('Escola ENS009', ['latitude' => '-5.0912', 'longitude' => '-42.8011']), null, '07:00', 'I');
+
+        $this->form($route)
+            ->assertSee('<div id="route_path_missing" class="route-path-alert route-path-alert-error" role="alert">Pontos sem localização: <span id="route_path_missing_list"><a href="/module/TransporteEscolar/Ponto?id=' . $dam . '">' . $dam . ' - Açude ENS009</a></span></div>', false)
+            ->assertSee('<button type="button" id="route_path_calculate" class="botaolistagemdisabled" disabled>Calcular trajeto</button>', false);
+    }
+
+    public function test_form_loads_the_saved_path_and_distances(): void
+    {
+        config([RoutePathService::KEY_SETTING => self::KEY]);
+        $route = $this->routeWithSavedPath();
+
+        $content = $this->form($route)
+            ->assertSee('<span id="route_path_calculated_at" class="route-path-note">Último cálculo: 12/11/2026 15:40</span>', false)
+            ->assertSee('<p id="route_path_not_calculated" class="route-path-note" hidden>', false)
+            ->assertSee('<div id="route_path_stale" class="route-path-alert route-path-alert-notice" role="alert" hidden>', false)
+            ->assertSee('name="km_ida" id="km_ida" value="18,40"', false)
+            ->assertSee('name="km_volta" id="km_volta" value="18,90"', false)
+            ->assertSee('name="km_pav" id="km_pav" value="29,10"', false)
+            ->assertSee('name="km_npav" id="km_npav" value="8,20"', false)
+            ->getContent();
+
+        $this->assertStringContainsString('"outbound":{"type":"LineString","coordinates":[[-42.8,-5.09],[-42.9,-5.2]]}', $content);
+        $this->assertMatchesRegularExpression('/"reference":"\d+:I,\d+:V"/', $content);
+    }
+
+    public function test_form_draws_each_direction_with_its_color_in_lines_legend_and_markers(): void
+    {
+        config([RoutePathService::KEY_SETTING => self::KEY]);
+
+        $content = $this->form($this->routeWithSavedPath())->getContent();
+
+        $this->assertStringContainsString('"colors":{"I":"#1f6fb2","V":"#b0561a"}', $content);
+        $this->assertStringContainsString('.route-path-legend-line.route-path-outbound { background: #1f6fb2; }', $content);
+        $this->assertStringContainsString('.route-path-legend-line.route-path-return { background: #b0561a; }', $content);
+        $this->assertStringContainsString('.route-path-marker.route-path-return, .route-path-marker-segment.route-path-return { background: #b0561a; }', $content);
+        $this->assertStringNotContainsString('#d9822b', $content);
+    }
+
+    public function test_form_keeps_the_map_under_the_fixed_action_bar_and_the_distances_on_a_narrow_screen(): void
+    {
+        config([RoutePathService::KEY_SETTING => self::KEY]);
+
+        $this->form($this->routeWithSavedPath())
+            ->assertSee('.transport-map { isolation: isolate;', false)
+            ->assertSee('.route-path-map-wrapper { position: relative; isolation: isolate; }', false)
+            ->assertSeeInOrder([
+                '@media (max-width: 767px) {',
+                'input#km_ida, input#km_volta { max-width: calc(100vw - 300px) !important; }',
+                'input#km_pav, input#km_npav { max-width: calc(100vw - 323px) !important; }',
+            ], false);
+    }
+
+    public function test_form_warns_when_the_itinerary_changed_after_the_calculation(): void
+    {
+        config([RoutePathService::KEY_SETTING => self::KEY]);
+        $route = $this->routeWithSavedPath();
+        DB::table('modules.itinerario_transporte_escolar')->where('ref_cod_rota_transporte_escolar', $route)->where('seq', 2)->update(['tipo' => 'I']);
+
+        $this->form($route)
+            ->assertSee('<div id="route_path_stale" class="route-path-alert route-path-alert-notice" role="alert">' . RoutePathService::STALE_MESSAGE . '</div>', false)
+            ->assertSee('"reference":null', false);
+    }
+
+    private function routeWithSavedPath(): int
+    {
+        $route = $this->routeRecord('Rota da Gameleira ENS009', 2026, ['km_pav' => 29.1, 'km_npav' => 8.2]);
+        $school = $this->stopRecord('Escola ENS009', ['latitude' => '-5.0912', 'longitude' => '-42.8011']);
+        $farm = $this->stopRecord('Fazenda ENS009', ['latitude' => '-5.2001', 'longitude' => '-42.9001']);
+        $this->itineraryStopRecord($route, 1, $farm, null, '06:30', 'I');
+        $this->itineraryStopRecord($route, 2, $school, null, '11:30', 'V');
+
+        DB::table('modules.rota_transporte_escolar')->where('cod_rota_transporte_escolar', $route)->update([
+            'km_ida' => 18.4,
+            'km_volta' => 18.9,
+            'trajeto_ida' => '{"type":"LineString","coordinates":[[-42.8,-5.09],[-42.9,-5.2]]}',
+            'trajeto_volta' => '{"type":"LineString","coordinates":[[-42.9,-5.2],[-42.8,-5.09]]}',
+            'trajeto_hash' => RoutePathService::hash((new RoutePathService)->savedStops($route)),
+            'trajeto_calculado_em' => '2026-11-12 15:40:00',
+        ]);
+
+        return $route;
     }
 
     private function form(int $route): TestResponse

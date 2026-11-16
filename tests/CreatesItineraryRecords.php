@@ -42,11 +42,18 @@ trait CreatesItineraryRecords
         return DB::table('modules.rota_transporte_escolar')->where('cod_rota_transporte_escolar', $route)->first();
     }
 
-    protected function stopRecord(string $name): int
+    protected function stopRecord(string $name, array $attributes = []): int
     {
-        return DB::table('modules.ponto_transporte_escolar')->insertGetId([
+        return DB::table('modules.ponto_transporte_escolar')->insertGetId(array_merge([
             'descricao' => $name,
-        ], 'cod_ponto_transporte_escolar');
+        ], $attributes), 'cod_ponto_transporte_escolar');
+    }
+
+    protected function stopCoordinates(int $stop): array
+    {
+        $record = DB::table('modules.ponto_transporte_escolar')->where('cod_ponto_transporte_escolar', $stop)->first(['latitude', 'longitude']);
+
+        return [$record->latitude, $record->longitude];
     }
 
     protected function vehicleRecord(string $name): int

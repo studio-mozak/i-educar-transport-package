@@ -2,6 +2,7 @@
 
 use App\Models\Enums\DayOfWeek;
 use iEducar\Legacy\Model;
+use Illuminate\Support\Facades\DB;
 
 class clsModulesRotaTransporteEscolar extends Model
 {
@@ -21,6 +22,16 @@ class clsModulesRotaTransporteEscolar extends Model
     ];
 
     public const NOT_INFORMED = 'Não informado';
+
+    public const DISTANCE_COLUMNS = ['km_ida', 'km_volta', 'km_pav', 'km_npav'];
+
+    public const DISTANCE_AND_PATH_COLUMNS = [
+        ...self::DISTANCE_COLUMNS,
+        'trajeto_ida',
+        'trajeto_volta',
+        'trajeto_hash',
+        'trajeto_calculado_em',
+    ];
 
     public $cod_rota_transporte_escolar;
     public $ref_idpes_destino;
@@ -161,6 +172,30 @@ class clsModulesRotaTransporteEscolar extends Model
         $db->Consulta("UPDATE {$this->_tabela} SET abrangencia = {$coverageValue}, dias_semana = {$weekdaysValue} WHERE cod_rota_transporte_escolar = '{$this->cod_rota_transporte_escolar}'");
 
         return true;
+    }
+
+    public function updateDistancesAndPath(array $values): bool
+    {
+        $values = array_intersect_key($values, array_flip(self::DISTANCE_AND_PATH_COLUMNS));
+
+        if (!is_numeric($this->cod_rota_transporte_escolar) || $values === []) {
+            return false;
+        }
+
+        DB::table($this->_tabela)
+            ->where('cod_rota_transporte_escolar', $this->cod_rota_transporte_escolar)
+            ->update($values);
+
+        return true;
+    }
+
+    public function copyDistancesAndPathFrom(int $sourceRoute): bool
+    {
+        $source = DB::table($this->_tabela)
+            ->where('cod_rota_transporte_escolar', $sourceRoute)
+            ->first(self::DISTANCE_AND_PATH_COLUMNS);
+
+        return $source !== null && $this->updateDistancesAndPath((array) $source);
     }
 
     /**
