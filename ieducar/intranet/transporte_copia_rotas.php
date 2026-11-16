@@ -139,10 +139,20 @@ return new class extends clsCadastro {
                         $valores .= "{$gruda}'{$registro['tercerizado']}'";
                         $gruda = ', ';
                     }
+                    foreach (['abrangencia', 'dias_semana'] as $column) {
+                        if (is_string($registro[$column])) {
+                            $campos .= "{$gruda}{$column}";
+                            $valores .= "{$gruda}'{$db->escapeString($registro[$column])}'";
+                            $gruda = ', ';
+                        }
+                    }
 
                     $db->Consulta("INSERT INTO {$this->_tabela} ( $campos ) VALUES( $valores )");
 
                     $this->cod_rota_transporte_escolar = $db->InsertId("{$this->_tabela}_seq");
+
+                    (new clsModulesRotaTransporteEscolar($this->cod_rota_transporte_escolar))
+                        ->copyDistancesAndPathFrom((int) $registro['cod_rota_transporte_escolar']);
                 }
                 $obj_rota = new clsModulesRotaTransporteEscolar();
                 $obj_rota->setOrderby(' descricao ASC');
