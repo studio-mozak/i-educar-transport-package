@@ -1,7 +1,11 @@
 <?php
 
+use iEducar\Packages\Transport\View\RoutePathMap;
+
 return new class extends clsDetalhe {
     public $titulo;
+
+    private $routePathMap;
 
     public function Gerar()
     {
@@ -30,10 +34,10 @@ return new class extends clsDetalhe {
         $this->addDetalhe(['Abrangência', clsModulesRotaTransporteEscolar::coverageName($registro['abrangencia'])]);
         $this->addDetalhe(['Dias de funcionamento', clsModulesRotaTransporteEscolar::weekdaysNames($registro['dias_semana'])]);
         if (trim($registro['km_pav'])!='') {
-            $this->addDetalhe(['Percurso pavimentado', $registro['km_pav'].' km']);
+            $this->addDetalhe(['Percurso pavimentado', RoutePathMap::kilometersText($registro['km_pav'])]);
         }
         if (trim($registro['km_npav'])!='') {
-            $this->addDetalhe(['Percurso não pavimentado', $registro['km_npav'].' km']);
+            $this->addDetalhe(['Percurso não pavimentado', RoutePathMap::kilometersText($registro['km_npav'])]);
         }
 
         $this->addDetalhe(['Terceirizado', ($registro['tercerizado'] == 'S' ? 'Sim' : 'Não')]);
@@ -109,6 +113,15 @@ return new class extends clsDetalhe {
             $this->addDetalhe(['Itinerário', '<a style=\' text-decoration: underline; font-size: 12px;\' href=\'/intranet/transporte_itinerario_cad.php?cod_rota='.$cod_rota_transporte_escolar.'\'>Editar itinerário</a>']);
         }
 
+        $this->routePathMap = new RoutePathMap((int) $cod_rota_transporte_escolar, false);
+        $this->addDetalhe($this->routePathMap->detailRow());
+
+        $directionsDistances = $this->routePathMap->directionsDistances();
+
+        if ($directionsDistances !== null) {
+            $this->addDetalhe(['Km ida / Km volta', $directionsDistances]);
+        }
+
         $obj_permissao = new clsPermissoes();
 
         if ($obj_permissao->permissao_cadastra(21238, $this->pessoa_logada, 7, null, true)) {
@@ -125,6 +138,16 @@ return new class extends clsDetalhe {
         $this->breadcrumb('Detalhe da rota', [
         url('intranet/educar_transporte_escolar_index.php') => 'Transporte escolar',
     ]);
+    }
+
+    public function makeExtra()
+    {
+        return $this->routePathMap instanceof RoutePathMap ? $this->routePathMap->script() : '';
+    }
+
+    public function makeCss()
+    {
+        return $this->routePathMap instanceof RoutePathMap ? $this->routePathMap->css() : '';
     }
 
     public function Formular()

@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\Enums\DayOfWeek;
+use iEducar\Packages\Transport\Services\RoutePathService;
+use iEducar\Packages\Transport\View\RoutePathMap;
 
 return new class extends clsCadastro {
     /**
@@ -16,6 +18,17 @@ return new class extends clsCadastro {
     public $dias_semana;
     public $weekdays_group;
     public $rejectedInput = false;
+    public $km_ida;
+    public $km_volta;
+    public $km_pav;
+    public $km_npav;
+    public $trajeto_ida;
+    public $trajeto_volta;
+    public $trajeto_hash;
+
+    private $routePathMap;
+
+    private const INVALID_DISTANCE_MESSAGE = 'Quilometragem ou trajeto inválidos.<br>';
 
     private const STOPS_KEPT_MESSAGE = 'Abrangência e dias salvos. Os pontos do itinerário não foram removidos; para apagar todos, use Excluir todos.<br>';
 
@@ -67,6 +80,11 @@ return new class extends clsCadastro {
         $this->descricao = $registro['descricao'];
         $this->abrangencia = $registro['abrangencia'];
         $this->dias_semana = clsModulesRotaTransporteEscolar::weekdaysFromColumn($registro['dias_semana']);
+
+        foreach (clsModulesRotaTransporteEscolar::DISTANCE_COLUMNS as $column) {
+            $this->$column = $this->routePathMap()->savedDistance($column);
+        }
+
         $this->url_cancelar = "transporte_rota_det.php?cod_rota={$this->cod_rota}";
         $this->nome_url_cancelar = 'Cancelar';
 
@@ -75,6 +93,42 @@ return new class extends clsCadastro {
         ]);
 
         return true;
+    }
+
+    private function routePathMap(): RoutePathMap
+    {
+        if (!$this->routePathMap instanceof RoutePathMap) {
+            $this->routePathMap = new RoutePathMap((int) $this->cod_rota, true);
+        }
+
+        return $this->routePathMap;
+    }
+
+    private function routePathInput(): ?array
+    {
+        $values = [];
+
+        foreach (clsModulesRotaTransporteEscolar::DISTANCE_COLUMNS as $column) {
+            if (!array_key_exists($column, $_POST)) {
+                continue;
+            }
+
+            $distance = RoutePathService::distanceFromInput($this->$column);
+
+            if ($distance === false) {
+                return null;
+            }
+
+            $values[$column] = $distance;
+        }
+
+        if (!filled($this->trajeto_hash)) {
+            return $values;
+        }
+
+        $path = RoutePathService::pathFromInput($this->trajeto_ida, $this->trajeto_volta, $this->trajeto_hash);
+
+        return $path === null ? null : $values + $path;
     }
 
     private function savedStops(): array
@@ -132,6 +186,15 @@ return new class extends clsCadastro {
         $this->campoQuebra();
         //---------------------FIM INCLUI DISCIPLINAS---------------------//
 
+        $this->addHtml($this->routePathMap()->formRow());
+        $this->campoMonetario('km_ida', 'Km ida', $this->km_ida, 10, 10);
+        $this->campoMonetario('km_volta', 'Km volta', $this->km_volta, 10, 10);
+        $this->campoMonetario('km_pav', 'Percurso pavimentado', $this->km_pav, 10, 10, false, '', '', 'onChange', false, true, 'km');
+        $this->campoMonetario('km_npav', 'Percurso não pavimentado', $this->km_npav, 10, 10, false, '', '', 'onChange', false, true, 'km');
+        $this->campoOculto('trajeto_ida', '');
+        $this->campoOculto('trajeto_volta', '');
+        $this->campoOculto('trajeto_hash', '');
+
         // carrega estilo para feedback messages, para exibir msg validação frequencia.
 
         $style = '/vendor/legacy/Portabilis/Assets/Stylesheets/Frontend.css';
@@ -157,6 +220,14 @@ return new class extends clsCadastro {
         $obj_permissoes->permissao_editar(21238, $this->pessoa_logada, 7, "transporte_rota_det.php?cod_rota={$this->cod_rota}");
 
         $route = new clsModulesRotaTransporteEscolar($this->cod_rota);
+        $routePath = $this->routePathInput();
+
+        if ($routePath === null) {
+            $this->mensagem = self::INVALID_DISTANCE_MESSAGE;
+            $this->showSavedRouteAfterRejection();
+
+            return false;
+        }
 
         if (!$route->updateCoverageAndWeekdays($this->abrangencia, $this->dias_semana)) {
             $this->mensagem = 'Abrangência ou dias de funcionamento inválidos.<br>';
@@ -164,6 +235,8 @@ return new class extends clsCadastro {
 
             return false;
         }
+
+        $route->updateDistancesAndPath($routePath);
 
         if (!$this->ref_cod_ponto_transporte_escolar && $this->savedStops() !== []) {
             $this->mensagem = self::STOPS_KEPT_MESSAGE;
@@ -211,6 +284,9 @@ return new class extends clsCadastro {
         $this->hora = null;
         $this->tipo = null;
         $this->ref_cod_veiculo = null;
+        $this->trajeto_ida = null;
+        $this->trajeto_volta = null;
+        $this->trajeto_hash = null;
     }
 
     private function weekdaysCheckboxes(): string
@@ -254,7 +330,12 @@ return new class extends clsCadastro {
 
     public function makeExtra()
     {
-        return file_get_contents(__DIR__ . '/scripts/transporte-itinerario-cad.js');
+        return file_get_contents(__DIR__ . '/scripts/transporte-itinerario-cad.js') . "\n" . $this->routePathMap()->script();
+    }
+
+    public function makeCss()
+    {
+        return $this->routePathMap()->css();
     }
 
     public function Formular()
