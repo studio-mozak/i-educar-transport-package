@@ -33,8 +33,42 @@ class PessoatransporteController extends ApiCoreController
         $pt->ref_cod_rota_transporte_escolar = $this->getRequest()->rota;
         $pt->observacao = $this->getRequest()->observacao;
         $pt->turno = $this->getRequest()->turno;
+        $pt->ano = $this->selectedRouteYear();
 
         return (is_null($id) ? $pt->cadastra() : $pt->edita());
+    }
+
+    protected function selectedRouteYear()
+    {
+        $routeId = $this->getRequest()->rota;
+
+        if (!is_numeric($routeId)) {
+            return null;
+        }
+
+        $route = (new clsModulesRotaTransporteEscolar($routeId))->detalhe();
+
+        return $route['ano'] ?? null;
+    }
+
+    protected function validatesPersonHasNoLinkInRouteYear($id = null)
+    {
+        $personId = $this->getRequest()->pessoa_id;
+        $year = $this->selectedRouteYear();
+
+        if (!is_numeric($personId) || !is_numeric($year)) {
+            return true;
+        }
+
+        $link = (new clsModulesPessoaTransporte(null, null, $personId, null, null, null, null, $year))->detalhe();
+
+        if (empty($link) || (string) $link['cod_pessoa_transporte'] === (string) $id) {
+            return true;
+        }
+
+        $this->messenger->append("Esta pessoa já possui vínculo de transporte em {$year}.");
+
+        return false;
     }
 
     protected function get()
@@ -51,7 +85,8 @@ class PessoatransporteController extends ApiCoreController
             'ref_idpes_destino' => 'pessoaj',
             'ref_idpes' => 'pessoa',
             'observacao' => 'observacao',
-            'turno' => 'turno'
+            'turno' => 'turno',
+            'ano' => 'ano'
         ];
 
         $pt = Portabilis_Array_Utils::filter($pt, $attrs);
@@ -75,7 +110,9 @@ class PessoatransporteController extends ApiCoreController
 
     protected function post()
     {
-        if ($this->validateSizeOfObservacao()) {
+        $id = null;
+
+        if ($this->validateSizeOfObservacao() && $this->validatesPersonHasNoLinkInRouteYear()) {
             $id = $this->createOrUpdatePessoaTransporte();
             if (is_numeric($id)) {
                 $this->messenger->append('Cadastro realizado com sucesso', 'success', false, 'error');
@@ -89,8 +126,9 @@ class PessoatransporteController extends ApiCoreController
 
     protected function put()
     {
-        if ($this->validateSizeOfObservacao()) {
-            $id = $this->getRequest()->id;
+        $id = $this->getRequest()->id;
+
+        if ($this->validateSizeOfObservacao() && $this->validatesPersonHasNoLinkInRouteYear($id)) {
             $editou = $this->createOrUpdatePessoaTransporte($id);
 
             if ($editou) {

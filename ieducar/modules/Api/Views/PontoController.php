@@ -186,6 +186,7 @@ class PontoController extends ApiCoreController
                 $registro['ref_idpes_destino'],
                 $registro['observacao']
             );
+            $editaPessoa->ref_cod_ponto_transporte_escolar = '';
 
             $editaPessoa->edita();
         }
