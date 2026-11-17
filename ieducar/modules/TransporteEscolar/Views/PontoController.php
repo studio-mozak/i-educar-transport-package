@@ -72,17 +72,8 @@ class PontoController extends Portabilis_Controller_Page_EditController
 
         $this->viewAddress();
 
-        $this->inputsHelper()->text('latitude', StopLocationMap::coordinateFieldOptions(
-            'Latitude',
-            StopLocationMap::LATITUDE_PLACEHOLDER,
-            clsModulesPontoTransporteEscolar::LATITUDE_LIMIT
-        ));
-
-        $this->inputsHelper()->text('longitude', StopLocationMap::coordinateFieldOptions(
-            'Longitude',
-            StopLocationMap::LONGITUDE_PLACEHOLDER,
-            clsModulesPontoTransporteEscolar::LONGITUDE_LIMIT
-        ));
+        $this->inputsHelper()->hidden('latitude');
+        $this->inputsHelper()->hidden('longitude');
 
         $stopLocationMap = new StopLocationMap;
         $this->addHtml($stopLocationMap->formRow());

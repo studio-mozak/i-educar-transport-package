@@ -111,11 +111,35 @@
     }
   }
 
+  function isButtonBusy(button) {
+    return button.getAttribute('aria-busy') === 'true';
+  }
+
+  function setButtonBusy(button, busy, label) {
+    if (busy) {
+      var width = button.getBoundingClientRect().width;
+
+      button.style.boxSizing = 'border-box';
+      button.style.minWidth = width + 'px';
+      button.setAttribute('aria-disabled', 'true');
+      button.setAttribute('aria-busy', 'true');
+    } else {
+      button.style.minWidth = '';
+      button.style.boxSizing = '';
+      button.removeAttribute('aria-disabled');
+      button.removeAttribute('aria-busy');
+    }
+
+    button.textContent = label;
+  }
+
   window.transportMap = {
     create: create,
     fitBlockToViewport: fitBlockToViewport,
     keepSized: keepSized,
     showDefaultView: showDefaultView,
+    isButtonBusy: isButtonBusy,
+    setButtonBusy: setButtonBusy,
     viewPadding: VIEW_PADDING
   };
 })(window, document);

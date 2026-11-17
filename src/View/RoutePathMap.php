@@ -117,9 +117,6 @@ class RoutePathMap
 .route-path-legend-line { display: inline-block; width: 22px; height: 4px; vertical-align: middle; }
 .route-path-legend-line.route-path-outbound { background: {$outboundColor}; }
 .route-path-legend-line.route-path-return { background: {$returnColor}; }
-.route-path-note { margin: 8px 0; color: #555; }
-.route-path-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; }
-.route-path-actions .botaolistagem, .route-path-actions .botaolistagemdisabled { margin: 0; }
 .route-path-marker, .route-path-marker-group { height: 24px; line-height: 20px; color: #fff; font-size: 12px; font-weight: bold; text-align: center; }
 .route-path-marker { width: 24px; border-radius: 50%; }
 .route-path-marker-group { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); display: flex; border-radius: 12px; overflow: hidden; }
@@ -130,7 +127,6 @@ class RoutePathMap
 @media (max-width: 767px) {
   .route-path-map,.route-path-detail .route-path-map { height: 300px; }
   .route-path-legend { position: static; box-shadow: none; padding: 6px 0 0; }
-  .route-path-actions .botaolistagem, .route-path-actions .botaolistagemdisabled { width: 100%; }
   input#km_ida, input#km_volta, input#km_pav, input#km_npav { max-width: calc(100vw - 323px) !important; }
 }
 CSS);
@@ -155,8 +151,8 @@ CSS);
 
         return $html
             . $this->paragraph('route_path_empty', 'route-path-note', RoutePathService::EMPTY_ITINERARY_MESSAGE, $isEmpty)
-            . '<div class="route-path-actions">'
-            . '<button type="button" id="route_path_calculate" class="' . ($disabled ? 'botaolistagemdisabled' : 'botaolistagem') . '"' . ($disabled ? ' disabled' : '') . '>' . self::CALCULATE_LABEL . '</button>'
+            . '<div class="transport-map-actions">'
+            . '<button type="button" id="route_path_calculate" class="botaolistagem transport-button"' . ($disabled ? ' disabled' : '') . '>' . self::CALCULATE_LABEL . '</button>'
             . $this->paragraph('route_path_calculated_at', 'route-path-note', $this->calculatedAtText(), $this->hasSavedPath(), 'span')
             . '</div>';
     }

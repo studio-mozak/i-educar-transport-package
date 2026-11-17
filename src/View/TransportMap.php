@@ -17,6 +17,8 @@ class TransportMap
 
     public const ERROR_COLOR = '#c0392b';
 
+    public const LINK_COLOR = '#1f6fb2';
+
     private const JSON_FOR_SCRIPT = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE;
 
     public static function script(string $dataName, array $data, string $pageScript): string
@@ -30,6 +32,7 @@ class TransportMap
     public static function css(string $pageCss): string
     {
         $errorColor = self::ERROR_COLOR;
+        $linkColor = self::LINK_COLOR;
 
         return self::leafletAsset('leaflet.css') . <<<CSS
 .transport-map { isolation: isolate; width: 100%; border: 1px solid #cddce6; border-radius: 3px; }
@@ -40,6 +43,19 @@ class TransportMap
 .route-path-alert-error { color: {$errorColor}; background-color: #ffeeee; }
 .route-path-alert-neutral { color: rgba(0, 0, 0, .75); background-color: lightgray; }
 .route-path-alert a { color: inherit; text-decoration: underline; }
+.route-path-note { margin: 8px 0; color: #555; }
+.transport-map-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; }
+.transport-map-actions[hidden], .transport-map-actions [hidden] { display: none; }
+.transport-map-actions .botaolistagem { margin: 0; }
+.botaolistagem.transport-button { width: auto; min-width: 160px; white-space: nowrap; }
+.botaolistagem.transport-button:disabled, .botaolistagem.transport-button[aria-disabled="true"] { background-color: #ccdce6; color: #47728f; border: 1px solid #cddce6; opacity: .6; cursor: not-allowed; }
+.botaolistagem.transport-button[aria-busy="true"] { cursor: progress; }
+.transport-link-button { background: none; border: 0; padding: 4px 0; color: {$linkColor}; text-decoration: underline; font-size: 14px; cursor: pointer; }
+.transport-button:focus-visible, .transport-link-button:focus-visible { outline: 2px solid {$linkColor}; outline-offset: 2px; }
+@media (max-width: 767px) {
+  .transport-map-actions { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .transport-map-actions .transport-button { width: 100%; }
+}
 
 CSS . $pageCss;
     }
