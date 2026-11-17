@@ -74,7 +74,7 @@ class RoutePathService
         return self::key() !== '';
     }
 
-    private static function key(): string
+    public static function key(): string
     {
         return trim((string) config(self::KEY_SETTING));
     }
@@ -430,13 +430,13 @@ class RoutePathService
                     'extra_info' => ['surface'],
                 ]);
         } catch (ConnectionException) {
-            $this->logFailure(['reason' => 'connection']);
+            self::logFailure(['reason' => 'connection']);
 
             return null;
         }
 
         if (!$response->successful()) {
-            $this->logFailure(['reason' => 'http_error', 'status' => $response->status()] + $this->serviceError($response));
+            self::logFailure(['reason' => 'http_error', 'status' => $response->status()] + self::serviceError($response));
 
             return null;
         }
@@ -445,7 +445,7 @@ class RoutePathService
         $coordinates = $feature['geometry']['coordinates'] ?? null;
 
         if (!is_array($feature) || !is_array($coordinates)) {
-            $this->logFailure(['reason' => 'invalid_body', 'status' => $response->status()]);
+            self::logFailure(['reason' => 'invalid_body', 'status' => $response->status()]);
 
             return null;
         }
@@ -462,18 +462,18 @@ class RoutePathService
         ];
     }
 
-    private function serviceError(Response $response): array
+    public static function serviceError(Response $response): array
     {
         $error = $response->json('error');
 
         if (is_array($error)) {
-            return ['code' => $error['code'] ?? null, 'message' => $this->safeMessage($error['message'] ?? null)];
+            return ['code' => $error['code'] ?? null, 'message' => self::safeMessage($error['message'] ?? null)];
         }
 
-        return ['code' => null, 'message' => $this->safeMessage($error)];
+        return ['code' => null, 'message' => self::safeMessage($error)];
     }
 
-    private function safeMessage($message): ?string
+    public static function safeMessage($message): ?string
     {
         if (!is_string($message) && !is_numeric($message)) {
             return null;
@@ -489,9 +489,9 @@ class RoutePathService
         return Str::limit($message, self::LOG_MESSAGE_LIMIT);
     }
 
-    private function logFailure(array $context): void
+    public static function logFailure(array $context, string $message = self::LOG_FAILURE_MESSAGE): void
     {
-        Log::warning(self::LOG_FAILURE_MESSAGE, $context);
+        Log::warning($message, $context);
     }
 
     private function pavedMeters($surfaces): float

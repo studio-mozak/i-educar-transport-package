@@ -190,7 +190,7 @@
       return element('route_path_calculate');
     }
 
-    function setButton(enabled, label) {
+    function setButton(enabled) {
       var node = button();
 
       if (!node) {
@@ -198,8 +198,7 @@
       }
 
       node.disabled = !enabled;
-      node.className = enabled ? 'botaolistagem' : 'botaolistagemdisabled';
-      node.textContent = label || config.messages.calculate;
+      transportMap.setButtonBusy(node, false, config.messages.calculate);
     }
 
     function refreshButton() {
@@ -344,7 +343,11 @@
     function calculate() {
       var sequence = tableSequence();
 
-      if (sequence === '' || state.calculating || state.blocked) {
+      if (state.calculating) {
+        return;
+      }
+
+      if (sequence === '' || state.blocked) {
         refreshButton();
 
         return;
@@ -353,7 +356,10 @@
       state.calculating = true;
       setVisible('route_path_failure', false);
       setVisible('route_path_missing', false);
-      setButton(false, config.messages.calculating);
+
+      if (button()) {
+        transportMap.setButtonBusy(button(), true, config.messages.calculating);
+      }
 
       $.ajax({
         url: config.endpoint,

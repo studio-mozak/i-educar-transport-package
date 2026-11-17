@@ -1,10 +1,15 @@
 <?php
 
+use App\Models\City;
 use App\Models\Place;
+use iEducar\Packages\Transport\Services\AddressLocationService;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Auth;
 
 class PontoController extends ApiCoreController
 {
+    public const LOCATE_FORBIDDEN_MESSAGE = 'Usuário sem permissão para cadastrar ou editar pontos.';
+
     protected $_processoAp = 21239;
     protected $_nivelAcessoOption = App_Model_NivelAcesso::SOMENTE_ESCOLA; // verificar
 
@@ -292,12 +297,48 @@ class PontoController extends ApiCoreController
         // TODO Addressing
     }
 
+    private function validatesAuthorizationToLocate(): bool
+    {
+        $permissions = $this->getClsPermissoes();
+        $process = $this->getBaseProcessoAp();
+        $user = Auth::id();
+
+        $can = $permissions->permissao_cadastra($process, $user, $this->_nivelAcessoOption)
+            || $permissions->permissao_editar($process, $user, $this->_nivelAcessoOption);
+
+        if (!$can) {
+            $this->messenger->append(self::LOCATE_FORBIDDEN_MESSAGE);
+        }
+
+        return $can;
+    }
+
+    private function getAddressLocation(): array
+    {
+        if (!$this->validatesAuthorizationToLocate()) {
+            return [];
+        }
+
+        $cityId = $this->getRequest()->city_id;
+        $city = is_numeric($cityId) ? City::query()->with('state')->find((int) $cityId) : null;
+
+        return (new AddressLocationService)->locate([
+            'address' => $this->getRequest()->address,
+            'number' => $this->getRequest()->number,
+            'neighborhood' => $this->getRequest()->neighborhood,
+            'city' => $city?->name,
+            'state' => $city?->state?->abbreviation,
+        ]);
+    }
+
     public function Gerar()
     {
         if ($this->isRequestFor('get', 'ponto')) {
             $this->appendResponse($this->get());
         } elseif ($this->isRequestFor('get', 'ponto-search')) {
             $this->appendResponse($this->search());
+        } elseif ($this->isRequestFor('get', AddressLocationService::API_RESOURCE)) {
+            $this->appendResponse($this->getAddressLocation());
         }
 
         // create

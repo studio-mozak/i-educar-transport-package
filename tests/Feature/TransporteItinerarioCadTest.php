@@ -5,6 +5,8 @@ namespace iEducar\Packages\Transport\Tests\Feature;
 use iEducar\Packages\Transport\Services\RoutePathService;
 use iEducar\Packages\Transport\Tests\CreatesDriverRecords;
 use iEducar\Packages\Transport\Tests\CreatesItineraryRecords;
+use iEducar\Packages\Transport\View\RoutePathMap;
+use iEducar\Packages\Transport\View\TransportMap;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
 use Illuminate\Support\Facades\DB;
@@ -146,7 +148,7 @@ class TransporteItinerarioCadTest extends TestCase
                 '<div id="route_path_map" class="transport-map route-path-map" role="region" aria-label="Mapa do trajeto da rota"></div>',
                 'route-path-outbound', ' Ida</span>', 'route-path-return', ' Volta</span>',
                 '<p id="route_path_not_calculated" class="route-path-note">Trajeto ainda não calculado.</p>',
-                '<button type="button" id="route_path_calculate" class="botaolistagem">Calcular trajeto</button>',
+                '<button type="button" id="route_path_calculate" class="botaolistagem transport-button">Calcular trajeto</button>',
                 'Km ida', 'name="km_ida" id="km_ida" value=""', 'km',
                 'Km volta', 'name="km_volta" id="km_volta" value=""', 'km',
                 'Percurso pavimentado', 'name="km_pav" id="km_pav" value=""', 'km',
@@ -187,7 +189,7 @@ class TransporteItinerarioCadTest extends TestCase
 
         $this->form($route)
             ->assertSee('<p id="route_path_empty" class="route-path-note">' . RoutePathService::EMPTY_ITINERARY_MESSAGE . '</p>', false)
-            ->assertSee('<button type="button" id="route_path_calculate" class="botaolistagemdisabled" disabled>Calcular trajeto</button>', false);
+            ->assertSee('<button type="button" id="route_path_calculate" class="botaolistagem transport-button" disabled>Calcular trajeto</button>', false);
     }
 
     public function test_form_lists_the_stops_without_coordinates_with_a_link_to_each_one(): void
@@ -200,7 +202,7 @@ class TransporteItinerarioCadTest extends TestCase
 
         $this->form($route)
             ->assertSee('<div id="route_path_missing" class="route-path-alert route-path-alert-error" role="alert">Pontos sem localização: <span id="route_path_missing_list"><a href="/module/TransporteEscolar/Ponto?id=' . $dam . '">' . $dam . ' - Açude ENS009</a></span></div>', false)
-            ->assertSee('<button type="button" id="route_path_calculate" class="botaolistagemdisabled" disabled>Calcular trajeto</button>', false);
+            ->assertSee('<button type="button" id="route_path_calculate" class="botaolistagem transport-button" disabled>Calcular trajeto</button>', false);
     }
 
     public function test_form_loads_the_saved_path_and_distances(): void
@@ -270,6 +272,28 @@ class TransporteItinerarioCadTest extends TestCase
         $this->form($route)
             ->assertSee('<div id="route_path_stale" class="route-path-alert route-path-alert-notice" role="alert">' . RoutePathService::STALE_MESSAGE . '</div>', false)
             ->assertSee('"reference":null', false);
+    }
+
+    public function test_calculate_button_keeps_the_look_of_the_button_while_busy_or_disabled(): void
+    {
+        config([RoutePathService::KEY_SETTING => self::KEY]);
+
+        $content = $this->form($this->routeWithSavedPath())
+            ->assertSee('.transport-map-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; }', false)
+            ->assertSee('.botaolistagem.transport-button { width: auto; min-width: 160px; white-space: nowrap; }', false)
+            ->assertSeeInOrder([
+                '.botaolistagem.transport-button:disabled, .botaolistagem.transport-button[aria-disabled="true"] { background-color: #ccdce6; color: #47728f; border: 1px solid #cddce6; opacity: .6; cursor: not-allowed; }',
+                '.botaolistagem.transport-button[aria-busy="true"] { cursor: progress; }',
+            ], false)
+            ->assertSee('<div class="transport-map-actions"><button type="button" id="route_path_calculate" class="botaolistagem transport-button">Calcular trajeto</button>', false)
+            ->assertSee('transportMap.setButtonBusy(button(), true, config.messages.calculating);', false)
+            ->getContent();
+
+        $this->assertSame(1, preg_match('/<tr id="tr_route_path">.*?<\/td><\/tr>/s', $content, $routePathRow));
+        $this->assertStringNotContainsString('botaolistagemdisabled', $routePathRow[0]);
+        $this->assertStringNotContainsString('route-path-actions', $content);
+        $this->assertStringNotContainsString('botaolistagemdisabled', file_get_contents(RoutePathMap::SCRIPT));
+        $this->assertStringNotContainsString('botaolistagemdisabled', file_get_contents(TransportMap::SCRIPT));
     }
 
     private function routeWithSavedPath(): int
