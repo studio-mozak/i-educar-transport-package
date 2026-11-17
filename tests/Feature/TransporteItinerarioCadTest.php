@@ -3,6 +3,7 @@
 namespace iEducar\Packages\Transport\Tests\Feature;
 
 use iEducar\Packages\Transport\Services\RoutePathService;
+use iEducar\Packages\Transport\Tests\CreatesDriverRecords;
 use iEducar\Packages\Transport\Tests\CreatesItineraryRecords;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
@@ -11,11 +12,12 @@ use Illuminate\Testing\TestResponse;
 use Tests\LoginFirstUser;
 use Tests\TestCase;
 
+require_once __DIR__ . '/../CreatesDriverRecords.php';
 require_once __DIR__ . '/../CreatesItineraryRecords.php';
 
 class TransporteItinerarioCadTest extends TestCase
 {
-    use CreatesItineraryRecords, DatabaseTransactions, LoginFirstUser, WithoutMiddleware;
+    use CreatesDriverRecords, CreatesItineraryRecords, DatabaseTransactions, LoginFirstUser, WithoutMiddleware;
 
     public const ROUTE = '/intranet/transporte_itinerario_cad.php';
 
@@ -108,6 +110,29 @@ class TransporteItinerarioCadTest extends TestCase
             ->assertSee('06:30', false);
     }
 
+    public function test_form_shows_description_and_plate_of_a_saved_vehicle_without_driver(): void
+    {
+        $route = $this->routeRecord('Rota da Gameleira ENS013', 2026);
+        $vehicle = $this->vehicleRecord('Microonibus ENS013', ['placa' => 'TST1A23']);
+        $this->itineraryStopRecord($route, 1, $this->stopRecord('Ponto da Gameleira ENS013'), $vehicle, '06:30', 'I');
+
+        $this->form($route)
+            ->assertSee('id="ref_cod_veiculo[0]" value="' . $vehicle . ' - Microonibus ENS013, Placa: TST1A23"', false);
+    }
+
+    public function test_form_shows_the_driver_of_a_saved_vehicle_that_has_one(): void
+    {
+        $route = $this->routeRecord('Rota da Gameleira ENS013', 2026);
+        $vehicle = $this->vehicleRecord('Microonibus ENS013', [
+            'placa' => 'TST1A23',
+            'ref_cod_motorista' => $this->driverRecord('Motorista ENS013', $this->companyRecord()),
+        ]);
+        $this->itineraryStopRecord($route, 1, $this->stopRecord('Ponto da Gameleira ENS013'), $vehicle, '06:30', 'I');
+
+        $this->form($route)
+            ->assertSee('id="ref_cod_veiculo[0]" value="' . $vehicle . ' - Microonibus ENS013, Placa: TST1A23, Motorista: Motorista ENS013"', false);
+    }
+
     public function test_form_shows_the_route_path_block_below_the_stops_table(): void
     {
         config([RoutePathService::KEY_SETTING => self::KEY]);
@@ -122,8 +147,8 @@ class TransporteItinerarioCadTest extends TestCase
                 'route-path-outbound', ' Ida</span>', 'route-path-return', ' Volta</span>',
                 '<p id="route_path_not_calculated" class="route-path-note">Trajeto ainda não calculado.</p>',
                 '<button type="button" id="route_path_calculate" class="botaolistagem">Calcular trajeto</button>',
-                'Km ida', 'name="km_ida" id="km_ida" value=""',
-                'Km volta', 'name="km_volta" id="km_volta" value=""',
+                'Km ida', 'name="km_ida" id="km_ida" value=""', 'km',
+                'Km volta', 'name="km_volta" id="km_volta" value=""', 'km',
                 'Percurso pavimentado', 'name="km_pav" id="km_pav" value=""', 'km',
                 'Percurso não pavimentado', 'name="km_npav" id="km_npav" value=""', 'km',
             ], false)
@@ -197,6 +222,19 @@ class TransporteItinerarioCadTest extends TestCase
         $this->assertMatchesRegularExpression('/"reference":"\d+:I,\d+:V"/', $content);
     }
 
+    public function test_form_shows_the_km_unit_next_to_each_of_the_four_distances(): void
+    {
+        config([RoutePathService::KEY_SETTING => self::KEY]);
+
+        $this->form($this->routeWithSavedPath())
+            ->assertSeeInOrder([
+                'id="km_ida" value="18,40" size="10" maxlength="10" > km',
+                'id="km_volta" value="18,90" size="10" maxlength="10" > km',
+                'id="km_pav" value="29,10" size="10" maxlength="10" > km',
+                'id="km_npav" value="8,20" size="10" maxlength="10" > km',
+            ], false);
+    }
+
     public function test_form_draws_each_direction_with_its_color_in_lines_legend_and_markers(): void
     {
         config([RoutePathService::KEY_SETTING => self::KEY]);
@@ -219,8 +257,7 @@ class TransporteItinerarioCadTest extends TestCase
             ->assertSee('.route-path-map-wrapper { position: relative; isolation: isolate; }', false)
             ->assertSeeInOrder([
                 '@media (max-width: 767px) {',
-                'input#km_ida, input#km_volta { max-width: calc(100vw - 300px) !important; }',
-                'input#km_pav, input#km_npav { max-width: calc(100vw - 323px) !important; }',
+                'input#km_ida, input#km_volta, input#km_pav, input#km_npav { max-width: calc(100vw - 323px) !important; }',
             ], false);
     }
 

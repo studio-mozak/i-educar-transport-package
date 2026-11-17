@@ -190,10 +190,9 @@ class clsModulesItinerarioTransporteEscolar extends Model
          (SELECT descricao
            FROM modules.ponto_transporte_escolar
            WHERE ref_cod_ponto_transporte_escolar = cod_ponto_transporte_escolar) as descricao,
-         (SELECT descricao || ', Placa: ' || placa || ', Motorista: ' || pessoa.nome
+         (SELECT " . clsModulesVeiculo::NAME_WITH_PLATE_AND_DRIVER_SQL . '
            FROM modules.veiculo
-           LEFT JOIN modules.motorista ON (motorista.cod_motorista = veiculo.ref_cod_motorista)
-           LEFT JOIN cadastro.pessoa ON (pessoa.idpes = motorista.ref_idpes)
+           ' . clsModulesVeiculo::DRIVER_PERSON_JOINS_SQL . "
            WHERE ref_cod_veiculo = cod_veiculo) as nome_onibus FROM {$this->_tabela}";
         $filtros = '';
 

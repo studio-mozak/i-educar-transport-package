@@ -187,8 +187,8 @@ return new class extends clsCadastro {
         //---------------------FIM INCLUI DISCIPLINAS---------------------//
 
         $this->addHtml($this->routePathMap()->formRow());
-        $this->campoMonetario('km_ida', 'Km ida', $this->km_ida, 10, 10);
-        $this->campoMonetario('km_volta', 'Km volta', $this->km_volta, 10, 10);
+        $this->campoMonetario('km_ida', 'Km ida', $this->km_ida, 10, 10, false, '', '', 'onChange', false, true, 'km');
+        $this->campoMonetario('km_volta', 'Km volta', $this->km_volta, 10, 10, false, '', '', 'onChange', false, true, 'km');
         $this->campoMonetario('km_pav', 'Percurso pavimentado', $this->km_pav, 10, 10, false, '', '', 'onChange', false, true, 'km');
         $this->campoMonetario('km_npav', 'Percurso não pavimentado', $this->km_npav, 10, 10, false, '', '', 'onChange', false, true, 'km');
         $this->campoOculto('trajeto_ida', '');

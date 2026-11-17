@@ -2,16 +2,21 @@
 
 namespace iEducar\Packages\Transport\Tests\Feature;
 
+use Closure;
+use iEducar\Packages\Transport\Tests\CreatesDriverRecords;
 use iEducar\Packages\Transport\Tests\CreatesTransportRecords;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Testing\TestResponse;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Api\DiarioApiRequestTestTrait;
 use Tests\TestCase;
 
+require_once __DIR__ . '/../CreatesDriverRecords.php';
 require_once __DIR__ . '/../CreatesTransportRecords.php';
 
 class VehicleApiTest extends TestCase
 {
-    use CreatesTransportRecords, DatabaseTransactions, DiarioApiRequestTestTrait;
+    use CreatesDriverRecords, CreatesTransportRecords, DatabaseTransactions, DiarioApiRequestTestTrait;
 
     public const ROUTE = '/module/Api/Veiculo';
 
@@ -61,6 +66,39 @@ class VehicleApiTest extends TestCase
             'modelo' => 'Volare W9',
             'terceirizado' => 'N',
         ]);
+    }
+
+    public static function searchQueries(): array
+    {
+        return [
+            'numeric search by code' => [fn (int $vehicle) => (string) $vehicle],
+            'text search by description' => [fn (int $vehicle) => 'Microônibus Timon'],
+        ];
+    }
+
+    #[DataProvider('searchQueries')]
+    public function test_search_shows_description_and_plate_when_the_vehicle_has_no_driver(Closure $query): void
+    {
+        $vehicle = $this->vehicleRecord(['descricao' => 'TESTE Microônibus Timon ENS013', 'placa' => 'TST1A23']);
+
+        $this->search($query($vehicle))->assertJsonPath('result.' . $vehicle, $vehicle . ' - TESTE Microônibus Timon ENS013, Placa: TST1A23');
+    }
+
+    #[DataProvider('searchQueries')]
+    public function test_search_keeps_the_driver_when_the_vehicle_has_one(Closure $query): void
+    {
+        $vehicle = $this->vehicleRecord([
+            'descricao' => 'TESTE Microônibus Timon ENS013',
+            'placa' => 'TST1A23',
+            'ref_cod_motorista' => $this->driverRecord('Motorista ENS013', $this->transportCompanyRecord()),
+        ]);
+
+        $this->search($query($vehicle))->assertJsonPath('result.' . $vehicle, $vehicle . ' - TESTE Microônibus Timon ENS013, Placa: TST1A23, Motorista: Motorista ENS013');
+    }
+
+    private function search(string $query): TestResponse
+    {
+        return $this->getResource(self::ROUTE, ['oper' => 'get', 'resource' => 'veiculo-search', 'query' => $query])->assertSuccessful();
     }
 
     private function formData(array $overrides): array
