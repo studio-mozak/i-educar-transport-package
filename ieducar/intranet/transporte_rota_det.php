@@ -1,11 +1,24 @@
 <?php
 
+use iEducar\Packages\Transport\View\DetailTable;
 use iEducar\Packages\Transport\View\RoutePathMap;
 
 return new class extends clsDetalhe {
     public $titulo;
 
     private $routePathMap;
+
+    private function vehicleText(array $vehicle): string
+    {
+        $parts = [$vehicle['descricao'], 'Placa: ' . $vehicle['placa']];
+        $driver = is_numeric($vehicle['ref_cod_motorista']) ? (new clsModulesMotorista($vehicle['ref_cod_motorista']))->detalhe() : false;
+
+        if ($driver && trim((string) $driver['nome_motorista']) !== '') {
+            $parts[] = 'Motorista: ' . $driver['nome_motorista'];
+        }
+
+        return implode(' - ', $parts);
+    }
 
     public function Gerar()
     {
@@ -47,65 +60,32 @@ return new class extends clsDetalhe {
         $obj = new clsModulesItinerarioTransporteEscolar();
         $obj->setOrderby('seq ASC');
         $lst = $obj->lista(null, $cod_rota_transporte_escolar);
+        $tabela = '';
 
         if ($lst) {
-            $tabela = '
-          <table>
-          <tr colspan=\'5\'><td><a style=\' text-decoration: underline;\' href=\'/intranet/transporte_itinerario_cad.php?cod_rota='.$cod_rota_transporte_escolar.'\'>Editar itinerário</a></td></tr>
-            <tr align="center">
-              <td bgcolor="#ccdce6"><b>Sequencial</b></td>
-              <td bgcolor="#ccdce6"><b>Ponto</b></td>
-              <td bgcolor="#ccdce6"><b>Hora</b></td>
-              <td bgcolor="#ccdce6"><b>Tipo</b></td>
-              <td bgcolor="#ccdce6"><b>Veículo</b></td>
-            </tr>';
-
-            $cont = 0;
+            $itineraryRows = [];
 
             foreach ($lst as $valor) {
-                if (($cont % 2) == 0) {
-                    $color = ' bgcolor="#f5f9fd" ';
-                } else {
-                    $color = ' bgcolor="#FFFFFF" ';
-                }
-
                 $obj_veiculo = new clsModulesVeiculo($valor['ref_cod_veiculo']);
                 $obj_veiculo = $obj_veiculo->detalhe();
 
-                $motorista = new clsModulesMotorista($obj_veiculo['ref_cod_motorista']);
-                $motorista = $motorista->detalhe();
-
-                $valor_veiculo = $obj_veiculo['descricao']==''?'':$obj_veiculo['descricao'].' - Placa: '.$obj_veiculo['placa'] . ' - Motorista: ' . $motorista['nome_motorista'];
+                $valor_veiculo = $obj_veiculo['descricao'] == '' ? '' : $this->vehicleText($obj_veiculo);
 
                 $obj_ponto = new clsModulesPontoTransporteEscolar($valor['ref_cod_ponto_transporte_escolar']);
                 $obj_ponto = $obj_ponto->detalhe();
                 $valor_ponto = $obj_ponto['descricao'];
 
-                $tabela .= sprintf(
-                    '
-            <tr>
-              <td %s align=left>%s</td>
-              <td %s align=left>%s</td>
-              <td %s align=left>%s</td>
-              <td %s align=left>%s</td>
-              <td %s align=left>%s</td>
-            </tr>',
-                    $color,
-                    $valor['seq'],
-                    $color,
-                    $valor_ponto,
-                    $color,
-                    $valor['hora'],
-                    $color,
-                    ($valor['tipo'] == 'V' ? 'Volta' : 'Ida'),
-                    $color,
-                    $valor_veiculo
-                );
-
-                $cont++;
+                $itineraryRows[] = [
+                    e($valor['seq']),
+                    e($valor_ponto),
+                    e($valor['hora']),
+                    $valor['tipo'] == 'V' ? 'Volta' : 'Ida',
+                    e($valor_veiculo),
+                ];
             }
 
-            $tabela .= '</table>';
+            $tabela = '<div><a style=\'text-decoration: underline;\' href=\'/intranet/transporte_itinerario_cad.php?cod_rota='.$cod_rota_transporte_escolar.'\'>Editar itinerário</a></div>'
+                . DetailTable::html(['Sequencial', 'Ponto', 'Hora', 'Tipo', 'Veículo'], $itineraryRows);
         }
         if ($tabela) {
             $this->addDetalhe(['Itinerário', $tabela]);

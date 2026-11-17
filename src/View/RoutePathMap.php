@@ -131,8 +131,7 @@ class RoutePathMap
   .route-path-map,.route-path-detail .route-path-map { height: 300px; }
   .route-path-legend { position: static; box-shadow: none; padding: 6px 0 0; }
   .route-path-actions .botaolistagem, .route-path-actions .botaolistagemdisabled { width: 100%; }
-  input#km_ida, input#km_volta { max-width: calc(100vw - 300px) !important; }
-  input#km_pav, input#km_npav { max-width: calc(100vw - 323px) !important; }
+  input#km_ida, input#km_volta, input#km_pav, input#km_npav { max-width: calc(100vw - 323px) !important; }
 }
 CSS);
     }

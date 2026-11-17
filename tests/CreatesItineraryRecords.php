@@ -56,9 +56,9 @@ trait CreatesItineraryRecords
         return [$record->latitude, $record->longitude];
     }
 
-    protected function vehicleRecord(string $name): int
+    protected function vehicleRecord(string $name, array $attributes = []): int
     {
-        return DB::table('modules.veiculo')->insertGetId([
+        return DB::table('modules.veiculo')->insertGetId(array_merge([
             'descricao' => $name,
             'renavam' => '12345678901',
             'passageiros' => 40,
@@ -68,7 +68,7 @@ trait CreatesItineraryRecords
             'adaptado_necessidades_especiais' => 'N',
             'ativo' => 'S',
             'ref_cod_empresa_transporte_escolar' => $this->companyRecord(),
-        ], 'cod_veiculo');
+        ], $attributes), 'cod_veiculo');
     }
 
     protected function itineraryStopRecord(int $route, int $sequence, int $stop, ?int $vehicle, string $time, string $direction): void

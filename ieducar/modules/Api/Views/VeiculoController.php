@@ -2,6 +2,11 @@
 
 class VeiculoController extends ApiCoreController
 {
+    private const SEARCH_SELECT = 'SELECT DISTINCT cod_veiculo AS id, '
+        . clsModulesVeiculo::NAME_WITH_PLATE_AND_DRIVER_SQL . ' AS name
+                 FROM modules.veiculo
+                 ' . clsModulesVeiculo::DRIVER_PERSON_JOINS_SQL;
+
     protected $_processoAp = 578; //verificar
     protected $_nivelAcessoOption = App_Model_NivelAcesso::SOMENTE_ESCOLA; // verificar
 
@@ -53,26 +58,18 @@ class VeiculoController extends ApiCoreController
 
     protected function sqlsForNumericSearch()
     {
-        $sqls[] = 'SELECT DISTINCT cod_veiculo AS id,
-                      (descricao || \', Placa: \' || placa || \', Motorista: \' || pessoa.nome) AS name
-                 FROM modules.veiculo
-                 LEFT JOIN modules.motorista ON (motorista.cod_motorista = veiculo.ref_cod_motorista)
-                 LEFT JOIN cadastro.pessoa ON (pessoa.idpes = motorista.ref_idpes)
-                WHERE (cod_veiculo::varchar LIKE $1||\'%\')
-                   OR (lower((placa)) LIKE \'%\'||lower(($1))||\'%\')';
+        $sqls[] = self::SEARCH_SELECT . "
+                WHERE (cod_veiculo::varchar LIKE $1||'%')
+                   OR (lower((placa)) LIKE '%'||lower(($1))||'%')";
 
         return $sqls;
     }
 
     protected function sqlsForStringSearch()
     {
-        $sqls[] = 'SELECT DISTINCT cod_veiculo AS id,
-                      (descricao || \', Placa: \' || placa || \', Motorista: \' || pessoa.nome) AS name
-                 FROM modules.veiculo
-                 LEFT JOIN modules.motorista ON (motorista.cod_motorista = veiculo.ref_cod_motorista)
-                 LEFT JOIN cadastro.pessoa ON (pessoa.idpes = motorista.ref_idpes)
-                WHERE (lower((descricao)) LIKE \'%\'||lower(($1))||\'%\')
-                   OR (lower((placa)) LIKE \'%\'||lower(($1))||\'%\')';
+        $sqls[] = self::SEARCH_SELECT . "
+                WHERE (lower((descricao)) LIKE '%'||lower(($1))||'%')
+                   OR (lower((placa)) LIKE '%'||lower(($1))||'%')";
 
         return $sqls;
     }

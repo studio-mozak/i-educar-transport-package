@@ -3,7 +3,9 @@
 namespace iEducar\Packages\Transport\Tests\Feature;
 
 use iEducar\Packages\Transport\Services\RoutePathService;
+use iEducar\Packages\Transport\Tests\CreatesDriverRecords;
 use iEducar\Packages\Transport\Tests\CreatesItineraryRecords;
+use iEducar\Packages\Transport\View\DetailTable;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
 use Illuminate\Support\Facades\DB;
@@ -11,11 +13,12 @@ use Illuminate\Testing\TestResponse;
 use Tests\LoginFirstUser;
 use Tests\TestCase;
 
+require_once __DIR__ . '/../CreatesDriverRecords.php';
 require_once __DIR__ . '/../CreatesItineraryRecords.php';
 
 class TransporteRotaDetTest extends TestCase
 {
-    use CreatesItineraryRecords, DatabaseTransactions, LoginFirstUser, WithoutMiddleware;
+    use CreatesDriverRecords, CreatesItineraryRecords, DatabaseTransactions, LoginFirstUser, WithoutMiddleware;
 
     public const ROUTE = '/intranet/transporte_rota_det.php';
 
@@ -81,6 +84,51 @@ class TransporteRotaDetTest extends TestCase
         $this->detail($route)
             ->assertSeeInOrder(['Dias de funcionamento', 'Seg', 'Itinerário', 'Editar itinerário', 'Sequencial', 'Ponto', 'Hora', 'Tipo', 'Veículo'], false)
             ->assertSeeInOrder(['Ponto da Gameleira ENS010', '06:30', 'Ida', 'Ônibus ENS010', 'Escola Municipal ENS010', '11:45', 'Volta'], false);
+    }
+
+    public function test_itinerary_table_uses_the_spaced_layout_with_header_and_content_aligned_left(): void
+    {
+        $route = $this->routeRecord('Rota da Gameleira ENS013', 2026);
+        $this->itineraryStopRecord($route, 1, $this->stopRecord('Ponto <b>Gameleira</b> ENS013'), $this->vehicleRecord('Ônibus ENS013'), '06:30', 'I');
+
+        $cell = '<td bgcolor="#f5f9fd" style="' . DetailTable::CELL_STYLE . '">';
+
+        $this->detail($route)
+            ->assertSeeInOrder([
+                'Editar itinerário',
+                '<div style="width: 0; min-width: 100%; overflow-x: auto;"><table><tr>',
+                '<td bgcolor="#ccdce6" role="columnheader" style="' . DetailTable::CELL_STYLE . '"><b>Sequencial</b></td>',
+                '<b>Veículo</b></td></tr>',
+                $cell . '1</td>',
+                $cell . 'Ponto &lt;b&gt;Gameleira&lt;/b&gt; ENS013</td>',
+                $cell . 'Ida</td>',
+                '</table></div>',
+            ], false)
+            ->assertDontSee('<tr align="center">', false)
+            ->assertDontSee('Ponto <b>Gameleira</b>', false);
+    }
+
+    public function test_itinerary_vehicle_without_driver_shows_no_driver_label(): void
+    {
+        $route = $this->routeRecord('Rota da Gameleira ENS013', 2026);
+        $this->itineraryStopRecord($route, 1, $this->stopRecord('Ponto da Gameleira ENS013'), $this->vehicleRecord('Microonibus ENS013', ['placa' => 'TST1A23']), '06:30', 'I');
+
+        $this->detail($route)
+            ->assertSee('<td bgcolor="#f5f9fd" style="' . DetailTable::CELL_STYLE . '">Microonibus ENS013 - Placa: TST1A23</td>', false)
+            ->assertDontSee('Motorista:', false);
+    }
+
+    public function test_itinerary_vehicle_with_driver_shows_the_driver_name(): void
+    {
+        $route = $this->routeRecord('Rota da Gameleira ENS013', 2026);
+        $vehicle = $this->vehicleRecord('Microonibus ENS013', [
+            'placa' => 'TST1A23',
+            'ref_cod_motorista' => $this->driverRecord('Motorista ENS013', $this->companyRecord()),
+        ]);
+        $this->itineraryStopRecord($route, 1, $this->stopRecord('Ponto da Gameleira ENS013'), $vehicle, '06:30', 'I');
+
+        $this->detail($route)
+            ->assertSee('<td bgcolor="#f5f9fd" style="' . DetailTable::CELL_STYLE . '">Microonibus ENS013 - Placa: TST1A23 - Motorista: Motorista ENS013</td>', false);
     }
 
     public function test_detail_shows_the_saved_path_read_only_after_the_itinerary(): void

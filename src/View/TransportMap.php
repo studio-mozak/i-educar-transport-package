@@ -33,6 +33,7 @@ class TransportMap
 
         return self::leafletAsset('leaflet.css') . <<<CSS
 .transport-map { isolation: isolate; width: 100%; border: 1px solid #cddce6; border-radius: 3px; }
+.leaflet-container .leaflet-control a { padding: 0; }
 .transport-marker { border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .5); }
 .route-path-alert { margin: 8px 0; border-radius: 3px; padding: 10px 12px; font-size: 14px; overflow-wrap: anywhere; }
 .route-path-alert-notice { color: #67664f; background-color: #fffee0; }

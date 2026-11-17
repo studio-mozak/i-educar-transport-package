@@ -1,5 +1,6 @@
 <?php
 
+use iEducar\Packages\Transport\View\DetailTable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -104,20 +105,14 @@ return new class extends clsDetalhe {
             return 'Veículo não utilizado em nenhum itinerário.';
         }
 
-        $rows = $routes->values()->map(function ($route, $index) {
-            $color = $index % 2 === 0 ? ' bgcolor="#f5f9fd" ' : ' bgcolor="#FFFFFF" ';
+        $rows = $routes->map(fn ($route) => [
+            e($route->year),
+            e($route->route_name),
+            $route->direction === 'V' ? 'Volta' : 'Ida',
+            sprintf('<a style="text-decoration: underline;" href="/intranet/transporte_itinerario_cad.php?cod_rota=%d">Editar itinerário</a>', $route->route_id),
+        ])->all();
 
-            return sprintf(
-                '<tr><td %1$s align=left>%2$s</td><td %1$s align=left>%3$s</td><td %1$s align=left>%4$s</td><td %1$s align=left><a style="text-decoration: underline;" href="/intranet/transporte_itinerario_cad.php?cod_rota=%5$d">Editar itinerário</a></td></tr>',
-                $color,
-                $route->year,
-                e($route->route_name),
-                $route->direction === 'V' ? 'Volta' : 'Ida',
-                $route->route_id
-            );
-        })->implode('');
-
-        return '<div style="width: 0; min-width: 100%; overflow-x: auto;"><table><tr align="center"><td bgcolor="#ccdce6"><b>Ano</b></td><td bgcolor="#ccdce6"><b>Rota</b></td><td bgcolor="#ccdce6"><b>Sentido</b></td><td bgcolor="#ccdce6"></td></tr>' . $rows . '</table></div>';
+        return DetailTable::html(['Ano', 'Rota', 'Sentido', ''], $rows);
     }
 
     public function Formular()

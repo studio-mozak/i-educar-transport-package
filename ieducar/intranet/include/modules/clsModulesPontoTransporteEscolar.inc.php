@@ -21,6 +21,8 @@ class clsModulesPontoTransporteEscolar extends Model
 
     public const COORDINATES_TOGETHER_MESSAGE = 'Informe a latitude e a longitude juntas, ou deixe as duas em branco.';
 
+    public const CITY_REQUIRED_MESSAGE = 'Informe o município.';
+
     private const COORDINATE_PATTERN = '/^-?\d+([.,]\d+)?$/';
 
     private const COORDINATE_FIELDS = [

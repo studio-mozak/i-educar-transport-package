@@ -3,6 +3,7 @@
 namespace iEducar\Packages\Transport\Tests\Feature;
 
 use iEducar\Packages\Transport\Tests\CreatesTransportRecords;
+use iEducar\Packages\Transport\View\DetailTable;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
 use Illuminate\Testing\TestResponse;
@@ -71,6 +72,22 @@ class VehicleDetailPageTest extends TestCase
             ->assertDontSee('Veículo não utilizado em nenhum itinerário.');
 
         $this->assertSame(3, substr_count($response->getContent(), 'Editar itinerário'));
+    }
+
+    public function test_routes_table_uses_the_spaced_layout_with_header_and_content_aligned_left(): void
+    {
+        $vehicle = $this->vehicleRecord();
+        $this->itineraryStopRecord($this->transportRouteRecord('Rota <i>Gameleira</i> ENS013', 2026), $vehicle, 'I', 1);
+
+        $this->detail($vehicle)
+            ->assertSeeInOrder([
+                '<div style="width: 0; min-width: 100%; overflow-x: auto;"><table><tr>',
+                '<td bgcolor="#ccdce6" role="columnheader" style="' . DetailTable::CELL_STYLE . '"><b>Ano</b></td>',
+                '<td bgcolor="#ccdce6" role="columnheader" style="' . DetailTable::CELL_STYLE . '"></td></tr>',
+                '<td bgcolor="#f5f9fd" style="' . DetailTable::CELL_STYLE . '">2026</td>',
+                'Rota &lt;i&gt;Gameleira&lt;/i&gt; ENS013',
+            ], false)
+            ->assertDontSee('<tr align="center">', false);
     }
 
     public function test_detail_shows_empty_message_when_vehicle_is_not_used(): void

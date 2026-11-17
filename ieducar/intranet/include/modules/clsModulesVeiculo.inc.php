@@ -4,6 +4,11 @@ use iEducar\Legacy\Model;
 
 class clsModulesVeiculo extends Model
 {
+    public const NAME_WITH_PLATE_AND_DRIVER_SQL = "concat_ws(', ', veiculo.descricao, 'Placa: ' || veiculo.placa, 'Motorista: ' || pessoa.nome)";
+
+    public const DRIVER_PERSON_JOINS_SQL = 'LEFT JOIN modules.motorista ON (motorista.cod_motorista = veiculo.ref_cod_motorista)
+                 LEFT JOIN cadastro.pessoa ON (pessoa.idpes = motorista.ref_idpes)';
+
     public $cod_veiculo;
     public $descricao;
     public $placa;

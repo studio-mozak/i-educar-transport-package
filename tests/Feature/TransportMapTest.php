@@ -30,6 +30,14 @@ class TransportMapTest extends TestCase
         $this->assertSame($expected, TransportMap::defaultCenter());
     }
 
+    public function test_map_controls_drop_the_padding_given_to_links_inside_table_cells(): void
+    {
+        $css = TransportMap::css('');
+
+        $this->assertStringContainsString('.leaflet-container .leaflet-control a { padding: 0; }', $css);
+        $this->assertGreaterThan(strpos($css, '.leaflet-control-zoom-in'), strpos($css, '.leaflet-container .leaflet-control a'));
+    }
+
     public function test_the_package_has_no_fixed_city_center(): void
     {
         $files = array_merge(

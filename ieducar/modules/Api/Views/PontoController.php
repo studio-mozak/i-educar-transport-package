@@ -1,16 +1,20 @@
 <?php
 
 use App\Models\Place;
-use iEducar\Modules\Addressing\LegacyAddressingFields;
+use Illuminate\Support\Arr;
 
 class PontoController extends ApiCoreController
 {
-    use LegacyAddressingFields;
-
     protected $_processoAp = 21239;
     protected $_nivelAcessoOption = App_Model_NivelAcesso::SOMENTE_ESCOLA; // verificar
 
     private ?array $coordinates = null;
+
+    private ?Place $place = null;
+
+    private array $addressValues = [];
+
+    private bool $hasAddress = false;
 
     protected function validatesCoordinates(): bool
     {
@@ -58,50 +62,71 @@ class PontoController extends ApiCoreController
         );
     }
 
+    protected function validatesAddress($id = null): bool
+    {
+        $this->place = $this->savedPlace($id);
+
+        $requestAddress = $this->requestAddress();
+        $this->addressValues = $this->place ? $this->sentFields($requestAddress) : $requestAddress;
+
+        $address = $this->place
+            ? array_merge($this->place->only(array_keys($requestAddress)), $this->addressValues)
+            : $this->addressValues;
+
+        $this->hasAddress = array_filter(
+            Arr::except($address, ['city_id']),
+            fn ($value) => filled($value)
+        ) !== [];
+
+        if ($this->hasAddress && blank($address['city_id'])) {
+            $this->messenger->append(clsModulesPontoTransporteEscolar::CITY_REQUIRED_MESSAGE, 'error');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function savedPlace($id): ?Place
+    {
+        $stop = (new clsModulesPontoTransporteEscolar($id))->detalhe();
+
+        if (!$stop || !is_numeric($stop['idlog'])) {
+            return null;
+        }
+
+        return Place::query()->find($stop['idlog']);
+    }
+
+    private function requestAddress(): array
+    {
+        return [
+            'address' => $this->getRequest()->address,
+            'number' => $this->getRequest()->number ?: null,
+            'complement' => $this->getRequest()->complement,
+            'neighborhood' => $this->getRequest()->neighborhood,
+            'city_id' => $this->getRequest()->city_id ?: null,
+            'postal_code' => idFederal2int((string) $this->getRequest()->postal_code),
+        ];
+    }
+
     protected function createOrUpdatePonto($id = null)
     {
-        $ponto = new clsModulesPontoTransporteEscolar();
+        $ponto = new clsModulesPontoTransporteEscolar;
         $ponto->cod_ponto_transporte_escolar = $id;
-
-        $detalhe = $ponto->detalhe();
-
-        if ($detalhe) {
-            $place = Place::query()->find($detalhe['idlog']);
-        }
-
-        // após cadastro não muda mais id pessoa
         $ponto->descricao = $this->getRequest()->desc;
 
-        $this->address = $this->getRequest()->address;
-        $this->number = $this->getRequest()->number;
-        $this->complement = $this->getRequest()->complement;
-        $this->neighborhood = $this->getRequest()->neighborhood;
-        $this->postal_code = $this->getRequest()->postal_code;
-        $this->city_id = $this->getRequest()->city_id;
+        if ($this->place || $this->hasAddress) {
+            $place = $this->place ?? new Place;
+            $place->fill($this->addressValues);
+            $place->save();
 
-        $address = [
-            'address' => $this->address,
-            'number' => $this->number ?: null,
-            'complement' => $this->complement,
-            'neighborhood' => $this->neighborhood,
-            'city_id' => $this->city_id,
-            'postal_code' => idFederal2int($this->postal_code),
-        ];
-
-        if (empty($place)) {
-            $place = new Place();
-        } else {
-            $address = $this->sentFields($address);
+            $ponto->cep = $place->postal_code;
+            $ponto->idbai = $place->getKey();
+            $ponto->idlog = $place->getKey();
+            $ponto->numero = $place->number;
+            $ponto->complemento = $place->complement;
         }
-
-        $place->fill($address);
-        $place->save();
-
-        $ponto->cep = $place->postal_code;
-        $ponto->idbai = $place->getKey();
-        $ponto->idlog = $place->getKey();
-        $ponto->numero = $place->number;
-        $ponto->complemento = $place->complement;
 
         $saved = is_null($id) ? $ponto->cadastra() : $ponto->edita();
 
@@ -277,14 +302,14 @@ class PontoController extends ApiCoreController
 
         // create
         elseif ($this->isRequestFor('post', 'ponto')) {
-            if ($this->validatesAuthorizationToChange() && $this->validatesCoordinates()) {
+            if ($this->validatesAuthorizationToChange() && $this->validatesCoordinates() && $this->validatesAddress()) {
                 $this->appendResponse($this->post());
             }
         }
 
         // update
         elseif ($this->isRequestFor('put', 'ponto')) {
-            if ($this->validatesAuthorizationToEdit() && $this->validatesCoordinates()) {
+            if ($this->validatesAuthorizationToEdit() && $this->validatesCoordinates() && $this->validatesAddress($this->getRequest()->id)) {
                 $this->appendResponse($this->put());
             }
         } elseif ($this->isRequestFor('delete', 'ponto')) {
