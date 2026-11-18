@@ -2,7 +2,6 @@
 
 namespace iEducar\Packages\Transport\Tests\Feature;
 
-use Database\Factories\LegacyUserFactory;
 use iEducar\Packages\Transport\Tests\CreatesItineraryRecords;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -16,8 +15,6 @@ require_once __DIR__ . '/../CreatesItineraryRecords.php';
 class RouteCoverageWeekdaysTest extends TestCase
 {
     use CreatesItineraryRecords, DatabaseTransactions, DiarioApiRequestTestTrait;
-
-    public const ITINERARY = '/intranet/transporte_itinerario_cad.php';
 
     public const ROUTE_API = '/module/Api/Rota';
 
@@ -189,14 +186,7 @@ class RouteCoverageWeekdaysTest extends TestCase
         $this->itineraryStopRecord($filled, 1, $this->stopRecord('Ponto da Gameleira ENS010'), null, '06:30', 'I');
         $this->itineraryStopRecord($old, 1, $this->stopRecord('Ponto antigo ENS010'), null, '07:00', 'I');
 
-        $this->actingAs(LegacyUserFactory::new()->admin()->create())
-            ->post('/intranet/transporte_copia_rotas.php', [
-                'tipoacao' => 'Novo',
-                'ref_cod_empresa_transporte_escolar' => (string) $company,
-                'ano_orig' => 2026,
-                'ano_dest' => 2027,
-            ])
-            ->assertSuccessful();
+        $this->copyRoutes($company)->assertSuccessful();
 
         $copies = DB::table('modules.rota_transporte_escolar')
             ->where('ref_cod_empresa_transporte_escolar', $company)
@@ -260,17 +250,5 @@ class RouteCoverageWeekdaysTest extends TestCase
         foreach ([3, 5, 6, 7, 1] as $day) {
             $this->assertStringContainsString('id="dias_semana_' . $day . '" value="' . $day . '">', $content);
         }
-    }
-
-    private function saveItinerary(int $route, array $input): TestResponse
-    {
-        $_GET = [];
-        $_POST = [];
-
-        return $this->actingAs(LegacyUserFactory::new()->admin()->create())
-            ->post(self::ITINERARY, array_merge([
-                'tipoacao' => 'Editar',
-                'cod_rota' => (string) $route,
-            ], $input));
     }
 }

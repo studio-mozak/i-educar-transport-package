@@ -63,6 +63,40 @@ class EducarAlunoDetTransportTest extends TestCase
             ->assertSee('overflow-x: auto;', false);
     }
 
+    public function test_shows_one_block_per_link_of_the_current_year_and_one_row_per_link_of_the_history(): void
+    {
+        $student = LegacyStudentFactory::new()->create();
+        $person = $student->ref_idpes;
+        $currentRoute = $this->routeRecord('Rota da Gameleira ENS016', $this->currentYear);
+        $this->transportUserRecord($person, $currentRoute, [
+            'ref_cod_ponto_transporte_escolar' => $this->stopRecord('Escola Municipal ENS016'),
+            'turno' => '1',
+        ]);
+        $this->transportUserRecord($person, $this->routeRecord('Rota do Sertão ENS016', $this->currentYear), [
+            'ref_cod_ponto_transporte_escolar' => $this->stopRecord('Praça Central ENS016'),
+            'turno' => '2',
+        ]);
+        $this->transportUserRecord($person, $currentRoute, ['turno' => '2']);
+        $this->transportUserRecord($person, $this->routeRecord('Rota antiga A ENS016', $this->currentYear - 1), ['turno' => '1']);
+        $this->transportUserRecord($person, $this->routeRecord('Rota antiga B ENS016', $this->currentYear - 1), ['turno' => '2']);
+
+        $response = $this->studentDetail($student->getKey())
+            ->assertSeeInOrder([
+                "Vínculos de transporte {$this->currentYear}",
+                '<div><span style="display: inline-block;">Rota da Gameleira ENS016</span> · <span style="display: inline-block;">Ponto: Escola Municipal ENS016</span> · <span style="display: inline-block;">Turno: Matutino</span></div>',
+                '<div><span style="display: inline-block;">Rota do Sertão ENS016</span> · <span style="display: inline-block;">Ponto: Praça Central ENS016</span> · <span style="display: inline-block;">Turno: Vespertino</span></div>',
+                '<div><span style="display: inline-block;">Rota da Gameleira ENS016</span> · <span style="display: inline-block;">Turno: Vespertino</span></div>',
+                'Histórico de transporte',
+                'Rota antiga A ENS016',
+                'Matutino',
+                'Rota antiga B ENS016',
+                'Vespertino',
+            ], false);
+
+        $this->assertSame(1, preg_match('/Histórico de transporte.*?<table>(.*?)<\/table>/s', $response->getContent(), $history));
+        $this->assertSame(3, substr_count($history[1], '<tr>'), 'header and one row per link');
+    }
+
     public function test_shows_only_the_current_year_link_without_history(): void
     {
         $student = LegacyStudentFactory::new()->create();
@@ -70,6 +104,7 @@ class EducarAlunoDetTransportTest extends TestCase
 
         $this->studentDetail($student->getKey())
             ->assertSeeInOrder(["Vínculo de transporte {$this->currentYear}", 'Rota da Gameleira ENS011'], false)
+            ->assertDontSee('Vínculos de transporte', false)
             ->assertDontSee('Ponto:', false)
             ->assertDontSee('Turno:', false)
             ->assertDontSee('Histórico de transporte', false)

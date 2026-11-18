@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\LoginFirstUser;
 use Tests\TestCase;
 
@@ -294,6 +295,140 @@ class TransporteItinerarioCadTest extends TestCase
         $this->assertStringNotContainsString('route-path-actions', $content);
         $this->assertStringNotContainsString('botaolistagemdisabled', file_get_contents(RoutePathMap::SCRIPT));
         $this->assertStringNotContainsString('botaolistagemdisabled', file_get_contents(TransportMap::SCRIPT));
+    }
+
+    public function test_invalid_times_reject_the_form_citing_each_line_and_keep_what_was_typed(): void
+    {
+        $route = $this->routeRecord('Rota da Gameleira ENS016', 2026, ['abrangencia' => 'M', 'dias_semana' => '2,4']);
+        [$farm, $school, $square] = $this->threeStops();
+        $this->itineraryStopRecord($route, 1, $farm, null, '06:30', 'I');
+        $this->itineraryStopRecord($route, 2, $school, null, '07:00', 'I');
+        $itineraryBefore = $this->itinerary($route);
+
+        $response = $this->saveItinerary($route, [
+            'descricao' => 'Rota+da+Gameleira+ENS016',
+            'abrangencia' => 'I',
+            'dias_semana' => ['6'],
+            'ref_cod_ponto_transporte_escolar' => [
+                $farm . ' - Fazenda ENS016',
+                $school . ' - Escola ENS016',
+                $square . ' - Praça ENS016',
+            ],
+            'hora' => ['06:40', '25:70', '6h'],
+            'tipo' => ['I', 'I', 'V'],
+            'ref_cod_veiculo' => ['', '', ''],
+            'km_ida' => '12,50',
+        ])->assertSuccessful();
+
+        $this->assertSame(
+            'Linha 2: Informe a hora no formato HH:MM, ex.: 06:30.<br>Linha 3: Informe a hora no formato HH:MM, ex.: 06:30.<br>',
+            session('error')
+        );
+
+        $saved = $this->route($route);
+        $this->assertSame('M', $saved->abrangencia);
+        $this->assertSame('2,4', $saved->dias_semana);
+        $this->assertNull($saved->km_ida);
+        $this->assertSame($itineraryBefore, $this->itinerary($route));
+
+        $response->assertSee('id="ref_cod_ponto_transporte_escolar[0]" value="' . $farm . ' - Fazenda ENS016"', false)
+            ->assertSee('id="ref_cod_ponto_transporte_escolar[2]" value="' . $square . ' - Praça ENS016"', false)
+            ->assertSee('id="hora[0]" value="06:40"', false)
+            ->assertSee('id="hora[1]" value="25:70"', false)
+            ->assertSee('id="hora[2]" value="6h"', false)
+            ->assertSee('id="km_ida" value="12,50"', false)
+            ->assertSee('Rota da Gameleira ENS016', false)
+            ->assertSee("id='btn_cancelar'", false)
+            ->assertDontSee('Rota%2Bda', false);
+
+        $content = $response->getContent();
+        $this->assertMatchesRegularExpression('/<option[^>]*value=["\']I["\'][^>]*selected/', $content);
+        $this->assertStringContainsString('id="dias_semana_6" value="6" checked>', $content);
+        $this->assertStringContainsString('id="dias_semana_2" value="2">', $content);
+    }
+
+    public function test_typed_values_shown_after_a_rejection_are_escaped(): void
+    {
+        $route = $this->routeRecord('Rota da Gameleira ENS016', 2026);
+
+        $response = $this->saveItinerary($route, [
+            'ref_cod_ponto_transporte_escolar' => ['1 - <script>alert(1)</script>'],
+            'hora' => ['"><u>'],
+            'tipo' => ['I'],
+            'ref_cod_veiculo' => ['2 - "><i>ENS016</i>'],
+        ])->assertSuccessful();
+
+        $this->assertSame('Linha 1: Informe a hora no formato HH:MM, ex.: 06:30.<br>', session('error'));
+        $response->assertDontSee('<script>alert(1)</script>', false)
+            ->assertDontSee('"><u>', false)
+            ->assertDontSee('<i>ENS016</i>', false)
+            ->assertSee('value="1 - &lt;script&gt;alert(1)&lt;/script&gt;"', false)
+            ->assertSee('id="hora[0]" value="&quot"', false)
+            ->assertSee('value="2 - &quot;&gt;&lt;i&gt;ENS016&lt;/i&gt;"', false);
+    }
+
+    public function test_empty_times_and_times_with_seconds_are_saved(): void
+    {
+        $route = $this->routeRecord('Rota da Gameleira ENS016', 2026);
+        [$farm, $school, $square] = $this->threeStops();
+
+        $this->saveItinerary($route, [
+            'ref_cod_ponto_transporte_escolar' => [
+                $farm . ' - Fazenda ENS016',
+                $school . ' - Escola ENS016',
+                $square . ' - Praça ENS016',
+            ],
+            'hora' => ['', '23:59', '06:30:00'],
+            'tipo' => ['I', 'I', 'V'],
+            'ref_cod_veiculo' => ['', '', ''],
+        ])->assertRedirect('transporte_rota_det.php?cod_rota=' . $route);
+
+        $this->assertSame([null, '23:59:00', '06:30:00'], array_column($this->itinerary($route), 'hora'));
+    }
+
+    public static function failuresInTheMiddleOfTheSave(): array
+    {
+        return [
+            'stop without code' => ['Ponto sem código ENS016', ''],
+            'vehicle that does not exist' => [null, '2147483000 - Ônibus inexistente ENS016'],
+        ];
+    }
+
+    #[DataProvider('failuresInTheMiddleOfTheSave')]
+    public function test_a_failure_in_the_middle_of_the_save_keeps_the_saved_route_and_itinerary(?string $secondStop, string $secondVehicle): void
+    {
+        $route = $this->routeRecord('Rota da Gameleira ENS016', 2026, ['abrangencia' => 'M', 'dias_semana' => '2,4', 'km_ida' => 18.4]);
+        [$farm, $school] = $this->threeStops();
+        $this->itineraryStopRecord($route, 1, $farm, null, '06:30', 'I');
+        $this->itineraryStopRecord($route, 2, $school, null, '07:00', 'I');
+        $routeBefore = $this->route($route);
+        $itineraryBefore = $this->itinerary($route);
+
+        $response = $this->saveItinerary($route, [
+            'abrangencia' => 'I',
+            'dias_semana' => ['6'],
+            'km_ida' => '20,00',
+            'ref_cod_ponto_transporte_escolar' => [$school . ' - Escola ENS016', $secondStop ?? $farm . ' - Fazenda ENS016'],
+            'hora' => ['06:40', '07:10'],
+            'tipo' => ['I', 'V'],
+            'ref_cod_veiculo' => ['', $secondVehicle],
+        ])->assertSuccessful();
+
+        $this->assertSame('Cadastro não realizado.<br>', session('error'));
+        $this->assertEquals($routeBefore, $this->route($route));
+        $this->assertSame($itineraryBefore, $this->itinerary($route));
+        $response->assertSee('id="ref_cod_ponto_transporte_escolar[0]" value="' . $school . ' - Escola ENS016"', false)
+            ->assertSee('id="hora[1]" value="07:10"', false)
+            ->assertSee('id="km_ida" value="20,00"', false);
+    }
+
+    private function threeStops(): array
+    {
+        return [
+            $this->stopRecord('Fazenda ENS016'),
+            $this->stopRecord('Escola ENS016'),
+            $this->stopRecord('Praça ENS016'),
+        ];
     }
 
     private function routeWithSavedPath(): int

@@ -380,8 +380,6 @@ class clsModulesPessoaTransporte extends Model
 
             if (is_numeric($this->cod_pessoa_transporte)) {
                 $sql .= " cod_pessoa_transporte = '{$this->cod_pessoa_transporte}'";
-            } elseif (is_numeric($this->ano)) {
-                $sql .= " ref_idpes = '{$this->ref_idpes}' AND ano = '{$this->ano}'";
             } else {
                 $sql .= " ref_idpes = '{$this->ref_idpes}' ORDER BY cod_pessoa_transporte DESC LIMIT 1 ";
             }

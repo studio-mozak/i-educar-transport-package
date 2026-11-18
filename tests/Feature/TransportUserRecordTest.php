@@ -3,7 +3,6 @@
 namespace iEducar\Packages\Transport\Tests\Feature;
 
 use iEducar\Packages\Transport\Tests\CreatesTransportUserRecords;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -14,14 +13,15 @@ class TransportUserRecordTest extends TestCase
 {
     use CreatesTransportUserRecords, DatabaseTransactions;
 
-    public function test_database_rejects_two_links_of_the_same_person_in_the_same_year(): void
+    public function test_database_accepts_many_links_of_the_same_person_in_the_same_year(): void
     {
         $person = $this->personRecord();
-        $this->transportUserRecord($person, $this->routeRecord('Rota A ENS011', 2026));
+        $route = $this->routeRecord('Rota A ENS016', 2026);
+        $this->transportUserRecord($person, $route, ['turno' => '1']);
+        $this->transportUserRecord($person, $this->routeRecord('Rota B ENS016', 2026));
+        $this->transportUserRecord($person, $route, ['turno' => '2']);
 
-        $this->expectException(UniqueConstraintViolationException::class);
-
-        DB::transaction(fn () => $this->transportUserRecord($person, $this->routeRecord('Rota B ENS011', 2026)));
+        $this->assertSame(3, $this->transportUserCount($person));
     }
 
     public function test_list_filters_by_year_destination_name_and_destination_id(): void
@@ -42,20 +42,6 @@ class TransportUserRecordTest extends TestCase
         $this->assertSame(2027, (int) $byYear[0]['ano']);
         $this->assertSame([$link2026], array_map('intval', array_column($byDestinationName, 'cod_pessoa_transporte')));
         $this->assertSame([$link2026], array_map('intval', array_column($byDestinationId, 'cod_pessoa_transporte')));
-    }
-
-    public function test_detail_by_person_and_year_returns_the_link_of_that_year(): void
-    {
-        $person = $this->personRecord();
-        $link2026 = $this->transportUserRecord($person, $this->routeRecord('Rota A ENS011', 2026));
-        $this->transportUserRecord($person, $this->routeRecord('Rota A ENS011', 2027));
-
-        $detail = (new \clsModulesPessoaTransporte(null, null, $person, null, null, null, null, 2026))->detalhe();
-        $missing = (new \clsModulesPessoaTransporte(null, null, $person, null, null, null, null, 2030))->detalhe();
-
-        $this->assertSame($link2026, (int) $detail['cod_pessoa_transporte']);
-        $this->assertSame(2026, (int) $detail['ano']);
-        $this->assertEmpty($missing);
     }
 
     public function test_edit_without_stop_and_destination_keeps_them(): void

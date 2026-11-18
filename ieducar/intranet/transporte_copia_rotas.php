@@ -1,5 +1,8 @@
 <?php
 
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+
 return new class extends clsCadastro {
     public $pessoa_logada;
     public $nome_url_sucesso = 'Efetuar cópia';
@@ -59,158 +62,149 @@ return new class extends clsCadastro {
 
     public function Novo()
     {
-        if (!$this->ano_orig or !$this->ref_cod_empresa_transporte_escolar or !$this->ano_dest) {
+        if (!self::isDigits($this->ref_cod_empresa_transporte_escolar) || !self::isDigits($this->ano_orig) || !self::isDigits($this->ano_dest)) {
             $this->mensagem = 'Preencha os dados corretamente.<br>';
 
             return false;
         }
 
-        $obj_rota = new clsModulesRotaTransporteEscolar();
-        $obj_rota->setOrderby(' descricao ASC');
-        $obj_rota->setLimite($this->limite, $this->offset);
+        $sourceRoutes = $this->companyRoutes($this->ano_orig);
 
-        $lista = $obj_rota->lista(
-            null,
-            null,
-            null,
-            null,
-            $this->ano_orig,
-            $this->ref_cod_empresa_transporte_escolar
-        );
-        if (is_array($lista) && count($lista)) {
-            $obj_rota = new clsModulesRotaTransporteEscolar();
-            $obj_rota->setOrderby(' descricao ASC');
-            $obj_rota->setLimite($this->limite, $this->offset);
-            $lista_new_rota = $obj_rota->lista(
-                null,
-                null,
-                null,
-                null,
-                $this->ano_dest,
-                $this->ref_cod_empresa_transporte_escolar
-            );//verificar se a ampresa ja tem rotas no ano destino.
-            if (!$lista_new_rota) {
-                foreach ($lista as $registro) {
-                    $db = new clsBanco();
-                    $this->_schema = 'modules.';
-                    $this->_tabela = "{$this->_schema}rota_transporte_escolar";
-
-                    $campos  = '';
-                    $valores = '';
-                    $gruda   = '';
-
-                    if (is_numeric($registro['ref_idpes_destino'])) {
-                        $campos .= "{$gruda}ref_idpes_destino";
-                        $valores .= "{$gruda}'{$registro['ref_idpes_destino']}'";
-                        $gruda = ', ';
-                    }
-                    if (is_string($registro['descricao'])) {
-                        $campos .= "{$gruda}descricao";
-                        $valores .= "{$gruda}'{$registro['descricao']}'";
-                        $gruda = ', ';
-                    }
-                    if (is_numeric($this->ano_dest)) {
-                        $campos .= "{$gruda}ano";
-                        $valores .= "{$gruda}'{$this->ano_dest}'";
-                        $gruda = ', ';
-                    }
-                    if (is_string($registro['tipo_rota'])) {
-                        $campos .= "{$gruda}tipo_rota";
-                        $valores .= "{$gruda}'{$registro['tipo_rota']}'";
-                        $gruda = ', ';
-                    }
-                    if (is_numeric($registro['km_pav'])) {
-                        $campos .= "{$gruda}km_pav";
-                        $valores .= "{$gruda}'{$registro['km_pav']}'";
-                        $gruda = ', ';
-                    }
-                    if (is_numeric($registro['km_npav'])) {
-                        $campos .= "{$gruda}km_npav";
-                        $valores .= "{$gruda}'{$registro['km_npav']}'";
-                        $gruda = ', ';
-                    }
-                    if (is_numeric($this->ref_cod_empresa_transporte_escolar)) {
-                        $campos .= "{$gruda}ref_cod_empresa_transporte_escolar";
-                        $valores .= "{$gruda}'{$this->ref_cod_empresa_transporte_escolar}'";
-                        $gruda = ', ';
-                    }
-                    if (is_string($registro['tercerizado'])) {
-                        $campos .= "{$gruda}tercerizado";
-                        $valores .= "{$gruda}'{$registro['tercerizado']}'";
-                        $gruda = ', ';
-                    }
-                    foreach (['abrangencia', 'dias_semana'] as $column) {
-                        if (is_string($registro[$column])) {
-                            $campos .= "{$gruda}{$column}";
-                            $valores .= "{$gruda}'{$db->escapeString($registro[$column])}'";
-                            $gruda = ', ';
-                        }
-                    }
-
-                    $db->Consulta("INSERT INTO {$this->_tabela} ( $campos ) VALUES( $valores )");
-
-                    $this->cod_rota_transporte_escolar = $db->InsertId("{$this->_tabela}_seq");
-
-                    (new clsModulesRotaTransporteEscolar($this->cod_rota_transporte_escolar))
-                        ->copyDistancesAndPathFrom((int) $registro['cod_rota_transporte_escolar']);
-                }
-                $obj_rota = new clsModulesRotaTransporteEscolar();
-                $obj_rota->setOrderby(' descricao ASC');
-                $obj_rota->setLimite($this->limite, $this->offset);
-                $lista_new_rota = $obj_rota->lista(
-                    null,
-                    null,
-                    null,
-                    null,
-                    $this->ano_dest,
-                    $this->ref_cod_empresa_transporte_escolar
-                );//pega as rotas novas.
-
-                $num = 0;
-                foreach ($lista as $registro) {
-                    $cod_rota_nova = $lista_new_rota[$num]['cod_rota_transporte_escolar'];
-                    $obj = new clsModulesItinerarioTransporteEscolar();
-                    $intinerario_old = $obj->lista(null, $registro['cod_rota_transporte_escolar']);  //pega os intinerários antigos
-                    $num2 = 0;
-                    foreach ($intinerario_old as $intinerario) {
-                        $intinerario_old[$num2]['ref_cod_rota_transporte_escolar'] = $cod_rota_nova; //substitui o cod das rotas antigas pelos novos
-                        $num2++;
-                    }
-                    foreach ($intinerario_old as $registro) {
-                        $obj = new clsModulesItinerarioTransporteEscolar(
-                            null,
-                            $registro['ref_cod_rota_transporte_escolar'],
-                            $registro['seq'],
-                            $registro['ref_cod_ponto_transporte_escolar'],
-                            $registro['ref_cod_veiculo'],
-                            $registro['hora'],
-                            $registro['tipo']
-                        );
-                        $obj->cadastra(); //grava os novos intinerários no banco
-                    }
-                    $num++;
-                }
-                $this->mensagem = 'Cópia efetuada com sucesso';
-
-                return true;
-            } else {
-                $this->mensagem = "A empresa já possuí­ rotas em {$this->ano_dest}";
-
-                return false;
-            }
-        } else {
+        if ($sourceRoutes === []) {
             $this->mensagem ="Não existe rotas em $this->ano_orig para essa empresa";
 
             return false;
         }
-    }
-    protected function flashMessage()
-    {
-        if (strpos($this->mensagem, 'sucesso')) {
-            return empty($this->mensagem) ? '' : "<p class='form_erro success'>$this->mensagem</p>";
-        } else {
-            return empty($this->mensagem) ? '' : "<p class='form_erro error'>$this->mensagem</p>";
+
+        $existingNames = array_map(
+            fn (array $route) => self::comparableName($route['descricao']),
+            $this->companyRoutes($this->ano_dest)
+        );
+
+        $copied = 0;
+        $skipped = 0;
+
+        foreach ($sourceRoutes as $route) {
+            if (in_array(self::comparableName($route['descricao']), $existingNames, true)) {
+                $skipped++;
+
+                continue;
+            }
+
+            try {
+                DB::transaction(fn () => $this->copyRoute($route));
+            } catch (QueryException|RuntimeException) {
+                $this->mensagem = $this->interruptedCopyMessage($route['descricao'], $copied);
+
+                return false;
+            }
+
+            $copied++;
         }
+
+        $this->mensagem = $this->copyResultMessage($copied, $skipped);
+
+        return $copied > 0;
+    }
+
+    private static function isDigits($value): bool
+    {
+        return is_scalar($value) && ctype_digit((string) $value);
+    }
+
+    private static function comparableName($name): string
+    {
+        return mb_strtoupper(trim((string) $name));
+    }
+
+    private function companyRoutes($year): array
+    {
+        $routes = new clsModulesRotaTransporteEscolar;
+        $routes->setOrderby(' descricao ASC');
+
+        return $routes->lista(null, null, null, null, $year, $this->ref_cod_empresa_transporte_escolar) ?: [];
+    }
+
+    private function copyRoute(array $source): void
+    {
+        $sourceRoute = (int) $source['cod_rota_transporte_escolar'];
+
+        $route = DB::table('modules.rota_transporte_escolar')->insertGetId([
+            'ref_idpes_destino' => $source['ref_idpes_destino'],
+            'descricao' => $source['descricao'],
+            'ano' => (int) $this->ano_dest,
+            'tipo_rota' => $source['tipo_rota'],
+            'km_pav' => $source['km_pav'],
+            'km_npav' => $source['km_npav'],
+            'ref_cod_empresa_transporte_escolar' => $this->ref_cod_empresa_transporte_escolar,
+            'tercerizado' => $source['tercerizado'],
+            'abrangencia' => $source['abrangencia'],
+            'dias_semana' => $source['dias_semana'],
+        ], 'cod_rota_transporte_escolar');
+
+        (new clsModulesRotaTransporteEscolar($route))->copyDistancesAndPathFrom($sourceRoute);
+
+        $this->copyItinerary($sourceRoute, $route);
+    }
+
+    private function copyItinerary(int $sourceRoute, int $route): void
+    {
+        $stops = (new clsModulesItinerarioTransporteEscolar)->lista(null, $sourceRoute) ?: [];
+
+        foreach ($stops as $stop) {
+            $copiedStop = new clsModulesItinerarioTransporteEscolar(
+                null,
+                $route,
+                $stop['seq'],
+                $stop['ref_cod_ponto_transporte_escolar'],
+                $stop['ref_cod_veiculo'],
+                $stop['hora'],
+                $stop['tipo']
+            );
+
+            if (!$copiedStop->cadastra()) {
+                throw new RuntimeException('Itinerary stop not copied.');
+            }
+        }
+    }
+
+    private function interruptedCopyMessage($routeName, int $copied): string
+    {
+        $failure = 'Não foi possível copiar a rota "' . e((string) $routeName) . '".';
+
+        if ($copied === 0) {
+            return "{$failure} Nenhuma rota copiada; tente de novo.";
+        }
+
+        return "{$failure} " . self::copiedRoutes($copied) . ' antes do erro; copie de novo para completar.';
+    }
+
+    private static function copiedRoutes(int $copied): string
+    {
+        return $copied === 1 ? '1 rota copiada' : "{$copied} rotas copiadas";
+    }
+
+    private function copyResultMessage(int $copied, int $skipped): string
+    {
+        $year = (int) $this->ano_dest;
+
+        if ($copied === 0) {
+            return $skipped === 1
+                ? "Nenhuma rota copiada: a rota já existia em {$year}."
+                : "Nenhuma rota copiada: todas já existiam em {$year}.";
+        }
+
+        $message = self::copiedRoutes($copied) . '.';
+
+        if ($skipped === 1) {
+            return $message . " 1 já existia em {$year} e não foi copiada.";
+        }
+
+        if ($skipped > 1) {
+            return $message . " {$skipped} já existiam em {$year} e não foram copiadas.";
+        }
+
+        return $message;
     }
 
     public function Formular()

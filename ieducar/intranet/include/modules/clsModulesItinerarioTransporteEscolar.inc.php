@@ -4,6 +4,8 @@ use iEducar\Legacy\Model;
 
 class clsModulesItinerarioTransporteEscolar extends Model
 {
+    public const TIME_PATTERN = '/^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/';
+
     public $cod_itinerario_transporte_escolar;
     public $ref_cod_rota_transporte_escolar;
     public $seq;
@@ -379,12 +381,11 @@ class clsModulesItinerarioTransporteEscolar extends Model
 
     public function checktime($time)
     {
-        list($hour, $minute) = explode(':', $time);
+        return self::isValidTime($time);
+    }
 
-        if ($hour > -1 && $hour < 24 && $minute > -1 && $minute < 60 && is_numeric($hour) && is_numeric($minute)) {
-            return true;
-        } else {
-            return false;
-        }
+    public static function isValidTime($time): bool
+    {
+        return is_string($time) && preg_match(self::TIME_PATTERN, $time) === 1;
     }
 }

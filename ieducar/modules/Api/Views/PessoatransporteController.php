@@ -51,26 +51,6 @@ class PessoatransporteController extends ApiCoreController
         return $route['ano'] ?? null;
     }
 
-    protected function validatesPersonHasNoLinkInRouteYear($id = null)
-    {
-        $personId = $this->getRequest()->pessoa_id;
-        $year = $this->selectedRouteYear();
-
-        if (!is_numeric($personId) || !is_numeric($year)) {
-            return true;
-        }
-
-        $link = (new clsModulesPessoaTransporte(null, null, $personId, null, null, null, null, $year))->detalhe();
-
-        if (empty($link) || (string) $link['cod_pessoa_transporte'] === (string) $id) {
-            return true;
-        }
-
-        $this->messenger->append("Esta pessoa já possui vínculo de transporte em {$year}.");
-
-        return false;
-    }
-
     protected function get()
     {
         $id = $this->getRequest()->id;
@@ -112,7 +92,7 @@ class PessoatransporteController extends ApiCoreController
     {
         $id = null;
 
-        if ($this->validateSizeOfObservacao() && $this->validatesPersonHasNoLinkInRouteYear()) {
+        if ($this->validateSizeOfObservacao()) {
             $id = $this->createOrUpdatePessoaTransporte();
             if (is_numeric($id)) {
                 $this->messenger->append('Cadastro realizado com sucesso', 'success', false, 'error');
@@ -128,7 +108,7 @@ class PessoatransporteController extends ApiCoreController
     {
         $id = $this->getRequest()->id;
 
-        if ($this->validateSizeOfObservacao() && $this->validatesPersonHasNoLinkInRouteYear($id)) {
+        if ($this->validateSizeOfObservacao()) {
             $editou = $this->createOrUpdatePessoaTransporte($id);
 
             if ($editou) {

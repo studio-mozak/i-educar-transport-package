@@ -3,6 +3,8 @@
 use App\Models\Enums\DayOfWeek;
 use iEducar\Packages\Transport\Services\RoutePathService;
 use iEducar\Packages\Transport\View\RoutePathMap;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 return new class extends clsCadastro {
     /**
@@ -31,6 +33,14 @@ return new class extends clsCadastro {
     private const INVALID_DISTANCE_MESSAGE = 'Quilometragem ou trajeto inválidos.<br>';
 
     private const STOPS_KEPT_MESSAGE = 'Abrangência e dias salvos. Os pontos do itinerário não foram removidos; para apagar todos, use Excluir todos.<br>';
+
+    private const INVALID_COVERAGE_MESSAGE = 'Abrangência ou dias de funcionamento inválidos.<br>';
+
+    private const INVALID_TIME_MESSAGE = 'Linha %d: Informe a hora no formato HH:MM, ex.: 06:30.<br>';
+
+    private const NOT_SAVED_MESSAGE = 'Cadastro não realizado.<br>';
+
+    private const STOP_FIELDS = ['ref_cod_ponto_transporte_escolar', 'hora', 'tipo', 'ref_cod_veiculo'];
 
     // INCLUI NOVO
     public $pontos;
@@ -65,7 +75,7 @@ return new class extends clsCadastro {
         return $retorno;
     }
 
-    private function loadSavedRoute(): bool
+    private function loadSavedRoute(bool $keepSubmittedValues = false): bool
     {
         if (!is_numeric($this->cod_rota)) {
             return false;
@@ -78,11 +88,14 @@ return new class extends clsCadastro {
         }
 
         $this->descricao = $registro['descricao'];
-        $this->abrangencia = $registro['abrangencia'];
-        $this->dias_semana = clsModulesRotaTransporteEscolar::weekdaysFromColumn($registro['dias_semana']);
 
-        foreach (clsModulesRotaTransporteEscolar::DISTANCE_COLUMNS as $column) {
-            $this->$column = $this->routePathMap()->savedDistance($column);
+        if (!$keepSubmittedValues) {
+            $this->abrangencia = $registro['abrangencia'];
+            $this->dias_semana = clsModulesRotaTransporteEscolar::weekdaysFromColumn($registro['dias_semana']);
+
+            foreach (clsModulesRotaTransporteEscolar::DISTANCE_COLUMNS as $column) {
+                $this->$column = $this->routePathMap()->savedDistance($column);
+            }
         }
 
         $this->url_cancelar = "transporte_rota_det.php?cod_rota={$this->cod_rota}";
@@ -139,6 +152,45 @@ return new class extends clsCadastro {
         return $itinerary->lista(null, $this->cod_rota) ?: [];
     }
 
+    private function submittedValue(string $field, $key): string
+    {
+        $value = ((array) $this->$field)[$key] ?? '';
+
+        return is_scalar($value) ? (string) $value : '';
+    }
+
+    private function submittedStops(): array
+    {
+        $stops = [];
+
+        foreach (array_keys((array) $this->ref_cod_ponto_transporte_escolar) as $key) {
+            $stops[] = array_map(
+                fn (string $field) => e($this->submittedValue($field, $key)),
+                self::STOP_FIELDS
+            );
+        }
+
+        return $stops;
+    }
+
+    private function invalidTimeMessages(): string
+    {
+        $messages = '';
+        $line = 1;
+
+        foreach (array_keys((array) $this->ref_cod_ponto_transporte_escolar) as $key) {
+            $time = $this->submittedValue('hora', $key);
+
+            if ($time !== '' && !clsModulesItinerarioTransporteEscolar::isValidTime($time)) {
+                $messages .= sprintf(self::INVALID_TIME_MESSAGE, $line);
+            }
+
+            $line++;
+        }
+
+        return $messages;
+    }
+
     public function Gerar()
     {
         $showSavedRoute = !$_POST || $this->rejectedInput;
@@ -147,6 +199,8 @@ return new class extends clsCadastro {
             foreach ($_POST as $campo => $val) {
                 $this->$campo = (!$this->$campo) ?  $val : $this->$campo ;
             }
+
+            $this->pontos = $this->submittedStops();
         }
 
         $this->campoRotulo('cod_rota', 'Código da rota', $this->cod_rota);
@@ -219,7 +273,6 @@ return new class extends clsCadastro {
         $obj_permissoes = new clsPermissoes();
         $obj_permissoes->permissao_editar(21238, $this->pessoa_logada, 7, "transporte_rota_det.php?cod_rota={$this->cod_rota}");
 
-        $route = new clsModulesRotaTransporteEscolar($this->cod_rota);
         $routePath = $this->routePathInput();
 
         if ($routePath === null) {
@@ -229,50 +282,82 @@ return new class extends clsCadastro {
             return false;
         }
 
-        if (!$route->updateCoverageAndWeekdays($this->abrangencia, $this->dias_semana)) {
-            $this->mensagem = 'Abrangência ou dias de funcionamento inválidos.<br>';
+        $invalidTimes = $this->invalidTimeMessages();
+
+        if ($invalidTimes !== '') {
+            return $this->keepSubmittedInputAfterRejection($invalidTimes);
+        }
+
+        try {
+            $saved = DB::transaction(fn () => $this->saveRouteAndStops($routePath));
+        } catch (QueryException|RuntimeException) {
+            return $this->keepSubmittedInputAfterRejection(self::NOT_SAVED_MESSAGE);
+        }
+
+        if (!$saved) {
+            $this->mensagem = self::INVALID_COVERAGE_MESSAGE;
             $this->showSavedRouteAfterRejection();
 
             return false;
         }
-
-        $route->updateDistancesAndPath($routePath);
 
         if (!$this->ref_cod_ponto_transporte_escolar && $this->savedStops() !== []) {
             $this->mensagem = self::STOPS_KEPT_MESSAGE;
             $this->simpleRedirect("transporte_rota_det.php?cod_rota={$this->cod_rota}");
         }
 
-        if ($this->ref_cod_ponto_transporte_escolar) {
-            $obj  = new clsModulesItinerarioTransporteEscolar();
-
-            $excluiu = $obj->excluirTodos($this->cod_rota);
-
-            if ($excluiu) {
-                $sequencial = 1;
-                foreach ($this->ref_cod_ponto_transporte_escolar as $key => $ponto) {
-                    $obj = new clsModulesItinerarioTransporteEscolar(
-                        null,
-                        $this->cod_rota,
-                        $sequencial,
-                        $this->retornaCodigo($ponto),
-                        $this->retornaCodigo($this->ref_cod_veiculo[$key]),
-                        $this->hora[$key],
-                        $this->tipo[$key]
-                    );
-                    $cadastrou1 = $obj->cadastra();
-                    if (!$cadastrou1) {
-                        $this->mensagem = 'Cadastro não realizado.<br>';
-
-                        return false;
-                    }
-                    $sequencial++;
-                }
-            }
-        }
-
         $this->mensagem .= 'Edição efetuada com sucesso.<br>';
         $this->simpleRedirect("transporte_rota_det.php?cod_rota={$this->cod_rota}");
+    }
+
+    private function saveRouteAndStops(array $routePath): bool
+    {
+        $route = new clsModulesRotaTransporteEscolar($this->cod_rota);
+
+        if (!$route->updateCoverageAndWeekdays($this->abrangencia, $this->dias_semana)) {
+            return false;
+        }
+
+        $route->updateDistancesAndPath($routePath);
+
+        if ($this->ref_cod_ponto_transporte_escolar) {
+            $this->replaceStops();
+        }
+
+        return true;
+    }
+
+    private function replaceStops(): void
+    {
+        (new clsModulesItinerarioTransporteEscolar)->excluirTodos($this->cod_rota);
+
+        $sequence = 1;
+
+        foreach ($this->ref_cod_ponto_transporte_escolar as $key => $stop) {
+            $itineraryStop = new clsModulesItinerarioTransporteEscolar(
+                null,
+                $this->cod_rota,
+                $sequence,
+                $this->retornaCodigo($stop),
+                $this->retornaCodigo($this->submittedValue('ref_cod_veiculo', $key)),
+                $this->submittedValue('hora', $key),
+                $this->submittedValue('tipo', $key)
+            );
+
+            if (!$itineraryStop->cadastra()) {
+                throw new RuntimeException(self::NOT_SAVED_MESSAGE);
+            }
+
+            $sequence++;
+        }
+    }
+
+    private function keepSubmittedInputAfterRejection(string $message): bool
+    {
+        $this->mensagem = $message;
+        $this->loadSavedRoute(keepSubmittedValues: true);
+
+        return false;
     }
 
     private function showSavedRouteAfterRejection(): void

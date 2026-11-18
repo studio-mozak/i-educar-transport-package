@@ -3,7 +3,6 @@
 namespace iEducar\Packages\Transport\Tests\Feature;
 
 use clsModulesRotaTransporteEscolar;
-use Database\Factories\LegacyUserFactory;
 use iEducar\Packages\Transport\Services\RoutePathService;
 use iEducar\Packages\Transport\Tests\CreatesItineraryRecords;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -15,8 +14,6 @@ require_once __DIR__ . '/../CreatesItineraryRecords.php';
 class RouteCopyPathTest extends TestCase
 {
     use CreatesItineraryRecords, DatabaseTransactions;
-
-    public const COPY_PAGE = '/intranet/transporte_copia_rotas.php';
 
     protected function setUp(): void
     {
@@ -49,7 +46,7 @@ class RouteCopyPathTest extends TestCase
         $empty = $this->routeRecord('Rota antiga ENS009', 2026, ['ref_cod_empresa_transporte_escolar' => $company]);
         $this->itineraryStopRecord($empty, 1, $school, null, '07:00', 'I');
 
-        $this->copyRoutes($company);
+        $this->copyRoutes($company)->assertSuccessful();
 
         $copies = DB::table('modules.rota_transporte_escolar')
             ->where('ref_cod_empresa_transporte_escolar', $company)
@@ -79,17 +76,5 @@ class RouteCopyPathTest extends TestCase
         foreach (clsModulesRotaTransporteEscolar::DISTANCE_AND_PATH_COLUMNS as $column) {
             $this->assertNull($old->{$column}, $column);
         }
-    }
-
-    private function copyRoutes(int $company): void
-    {
-        $this->actingAs(LegacyUserFactory::new()->admin()->create())
-            ->post(self::COPY_PAGE, [
-                'tipoacao' => 'Novo',
-                'ref_cod_empresa_transporte_escolar' => (string) $company,
-                'ano_orig' => 2026,
-                'ano_dest' => 2027,
-            ])
-            ->assertSuccessful();
     }
 }

@@ -4,7 +4,9 @@ namespace iEducar\Packages\Transport\Tests;
 
 use Database\Factories\LegacyIndividualFactory;
 use Database\Factories\LegacyOrganizationFactory;
+use Database\Factories\LegacyUserFactory;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
 
 trait CreatesItineraryRecords
 {
@@ -91,5 +93,31 @@ trait CreatesItineraryRecords
             ->get(['seq', 'ref_cod_ponto_transporte_escolar', 'ref_cod_veiculo', 'hora', 'tipo'])
             ->map(fn ($stop) => (array) $stop)
             ->all();
+    }
+
+    protected function saveItinerary(int $route, array $input): TestResponse
+    {
+        $_GET = [];
+        $_POST = [];
+
+        return $this->actingAs(LegacyUserFactory::new()->admin()->create())
+            ->post('/intranet/transporte_itinerario_cad.php', array_merge([
+                'tipoacao' => 'Editar',
+                'cod_rota' => (string) $route,
+            ], $input));
+    }
+
+    protected function copyRoutes(int $company, int $sourceYear = 2026, int $targetYear = 2027): TestResponse
+    {
+        $_GET = [];
+        $_POST = [];
+
+        return $this->actingAs(LegacyUserFactory::new()->admin()->create())
+            ->post('/intranet/transporte_copia_rotas.php', [
+                'tipoacao' => 'Novo',
+                'ref_cod_empresa_transporte_escolar' => (string) $company,
+                'ano_orig' => $sourceYear,
+                'ano_dest' => $targetYear,
+            ]);
     }
 }
