@@ -45,25 +45,21 @@ class TransportUserYearTest extends TestCase
         ]);
     }
 
-    public function test_post_blocks_a_second_link_in_the_same_year(): void
+    public function test_post_saves_a_link_in_another_route_of_a_year_that_already_has_one(): void
     {
         $person = $this->personRecord();
-        $this->transportUserRecord($person, $this->routeRecord('Rota A ENS011', 2026));
-        $otherRoute = $this->routeRecord('Rota B ENS011', 2026);
+        $this->transportUserRecord($person, $this->routeRecord('Rota A ENS016', 2026), ['turno' => '1']);
 
-        $response = $this->postResource(self::ROUTE, [
-            'oper' => 'post',
-            'resource' => 'pessoatransporte',
-            'pessoa_id' => $person,
-            'rota' => $otherRoute,
-        ])->assertSuccessful();
+        $this->assertSecondLinkIsSaved($person, $this->routeRecord('Rota B ENS016', 2026), 1);
+    }
 
-        $this->assertTrue($response->json('any_error_msg'));
-        $this->assertSame(
-            'Esta pessoa já possui vínculo de transporte em 2026.',
-            $response->json('msgs.0.msg')
-        );
-        $this->assertSame(1, $this->transportUserCount($person));
+    public function test_post_saves_a_link_in_the_same_route_with_another_period(): void
+    {
+        $person = $this->personRecord();
+        $route = $this->routeRecord('Rota A ENS016', 2026);
+        $this->transportUserRecord($person, $route, ['turno' => '1']);
+
+        $this->assertSecondLinkIsSaved($person, $route, 2);
     }
 
     public function test_post_allows_a_link_in_another_year(): void
@@ -87,23 +83,24 @@ class TransportUserYearTest extends TestCase
         ]);
     }
 
-    public function test_put_blocks_moving_a_link_to_a_year_already_taken(): void
+    public function test_put_moves_a_link_to_a_year_that_already_has_another_link(): void
     {
         $person = $this->personRecord();
-        $this->transportUserRecord($person, $this->routeRecord('Rota A ENS011', 2026));
-        $link = $this->transportUserRecord($person, $this->routeRecord('Rota A ENS011', 2027));
-        $routeIn2026 = $this->routeRecord('Rota B ENS011', 2026);
+        $this->transportUserRecord($person, $this->routeRecord('Rota A ENS016', 2026));
+        $link = $this->transportUserRecord($person, $this->routeRecord('Rota A ENS016', 2027));
+        $routeIn2026 = $this->routeRecord('Rota B ENS016', 2026);
 
-        $response = $this->postResource(self::ROUTE, [
+        $this->postResource(self::ROUTE, [
             'oper' => 'put',
             'resource' => 'pessoatransporte',
             'id' => $link,
             'pessoa_id' => $person,
             'rota' => $routeIn2026,
-        ])->assertSuccessful();
+        ])->assertSuccessful()->assertJsonPath('any_error_msg', false);
 
-        $this->assertSame('Esta pessoa já possui vínculo de transporte em 2026.', $response->json('msgs.0.msg'));
-        $this->assertSame(2027, (int) $this->transportUser($link)->ano);
+        $saved = $this->transportUser($link);
+        $this->assertSame($routeIn2026, (int) $saved->ref_cod_rota_transporte_escolar);
+        $this->assertSame(2026, (int) $saved->ano);
     }
 
     public function test_put_moves_the_link_to_another_route_of_the_same_year(): void
@@ -201,5 +198,26 @@ class TransportUserYearTest extends TestCase
         $this->getResource(self::ROUTE, ['oper' => 'get', 'resource' => 'pessoatransporte', 'id' => $link])
             ->assertSuccessful()
             ->assertJson(['id' => $link, 'ano' => 2026]);
+    }
+
+    private function assertSecondLinkIsSaved(int $person, int $route, int $period): void
+    {
+        $response = $this->postResource(self::ROUTE, [
+            'oper' => 'post',
+            'resource' => 'pessoatransporte',
+            'pessoa_id' => $person,
+            'rota' => $route,
+            'turno' => $period,
+        ])->assertSuccessful()->assertJsonPath('any_error_msg', false);
+
+        $this->assertSame('Cadastro realizado com sucesso', $response->json('msgs.0.msg'));
+        $this->assertSame(2, $this->transportUserCount($person));
+        $this->assertDatabaseHas('modules.pessoa_transporte', [
+            'cod_pessoa_transporte' => $response->json('id'),
+            'ref_idpes' => $person,
+            'ref_cod_rota_transporte_escolar' => $route,
+            'turno' => (string) $period,
+            'ano' => 2026,
+        ]);
     }
 }

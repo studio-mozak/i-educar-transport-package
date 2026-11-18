@@ -2,10 +2,8 @@
 
 namespace iEducar\Packages\Transport\Tests\Feature;
 
-use Database\Factories\LegacyUserFactory;
 use iEducar\Packages\Transport\Tests\CreatesItineraryRecords;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -14,8 +12,6 @@ require_once __DIR__ . '/../CreatesItineraryRecords.php';
 class RoutePathSaveTest extends TestCase
 {
     use CreatesItineraryRecords, DatabaseTransactions;
-
-    public const ITINERARY = '/intranet/transporte_itinerario_cad.php';
 
     public const OUTBOUND_PATH = '{"type":"LineString","coordinates":[[-42.9001,-5.2001],[-42.8011,-5.0912]]}';
 
@@ -171,17 +167,5 @@ class RoutePathSaveTest extends TestCase
     private function pathColumns(object $route): array
     {
         return array_intersect_key((array) $route, array_flip(\clsModulesRotaTransporteEscolar::DISTANCE_AND_PATH_COLUMNS));
-    }
-
-    private function saveItinerary(int $route, array $input): TestResponse
-    {
-        $_GET = [];
-        $_POST = [];
-
-        return $this->actingAs(LegacyUserFactory::new()->admin()->create())
-            ->post(self::ITINERARY, array_merge([
-                'tipoacao' => 'Editar',
-                'cod_rota' => (string) $route,
-            ], $input));
     }
 }
