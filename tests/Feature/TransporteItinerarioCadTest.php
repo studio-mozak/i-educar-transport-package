@@ -113,6 +113,35 @@ class TransporteItinerarioCadTest extends TestCase
             ->assertSee('06:30', false);
     }
 
+    public function test_form_masks_each_stop_time_with_the_jquery_mask_plugin(): void
+    {
+        $route = $this->routeRecord('Rota da Gameleira ENS016', 2026);
+        $this->itineraryStopRecord($route, 1, $this->stopRecord('Ponto da Gameleira ENS016'), $this->vehicleRecord('Ônibus ENS016'), '06:30', 'V');
+
+        $this->form($route)
+            ->assertSee('name="hora[0]" id="hora[0]" value="06:30" size="6" maxlength="5"', false)
+            ->assertSee("var stopTimeFieldSelector = 'input[name^=\"hora[\"]';", false)
+            ->assertSee('var stopTimeMaskOptions = { translation: { H: { pattern: /[0-2]/ }, M: { pattern: /[0-5]/ } } };', false)
+            ->assertSee("field.removeAttribute('onkeypress');", false)
+            ->assertSee("field.setAttribute('inputmode', 'decimal');", false)
+            ->assertSee("field.style.minWidth = 'calc(5ch + ' + horizontalBoxSpace(field) + 'px)';", false)
+            ->assertSee("$j(field).removeAttr('maxlength').mask('H0:M0', stopTimeMaskOptions).off('input.stopTime').on('input.stopTime', reapplyStopTimeMask);", false)
+            ->assertSeeInOrder([
+                'var digitsBeforeCaret = digitCount(this.value.slice(0, this.selectionStart));',
+                "$j(this).trigger('keyup.mask');",
+                'if (isDeletion(event)) {',
+                'var caret = caretAfterDigits(this.value, digitsBeforeCaret);',
+                'this.setSelectionRange(caret, caret);',
+            ], false)
+            ->assertDontSee('clearIfNotMatch', false)
+            ->assertSeeInOrder([
+                'maskStopTimeFields();',
+                '$addPontosButton.click(function(){',
+                'setAutoComplete();',
+                'maskStopTimeFields();',
+            ], false);
+    }
+
     public function test_form_shows_description_and_plate_of_a_saved_vehicle_without_driver(): void
     {
         $route = $this->routeRecord('Rota da Gameleira ENS013', 2026);
