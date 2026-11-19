@@ -50,6 +50,62 @@ function setAutoComplete() {
 
 setAutoComplete();
 
+var stopTimeFieldSelector = 'input[name^="hora["]';
+var stopTimeMaskOptions = { translation: { H: { pattern: /[0-2]/ }, M: { pattern: /[0-5]/ } } };
+
+var horizontalBoxSpace = function(field) {
+  var style = window.getComputedStyle(field);
+
+  return ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'].reduce(function(total, property) {
+    return total + (parseFloat(style[property]) || 0);
+  }, 0);
+};
+
+var digitCount = function(text) {
+  return text.replace(/\D/g, '').length;
+};
+
+var caretAfterDigits = function(value, digits) {
+  var caret = 0;
+
+  while (caret < value.length && digitCount(value.slice(0, caret)) < digits) {
+    caret++;
+  }
+
+  return caret;
+};
+
+var isDeletion = function(event) {
+  return /^delete/.test((event.originalEvent || {}).inputType);
+};
+
+var reapplyStopTimeMask = function(event) {
+  var digitsBeforeCaret = digitCount(this.value.slice(0, this.selectionStart));
+
+  $j(this).trigger('keyup.mask');
+
+  if (isDeletion(event)) {
+    return;
+  }
+
+  var caret = caretAfterDigits(this.value, digitsBeforeCaret);
+
+  this.setSelectionRange(caret, caret);
+};
+
+var maskStopTimeField = function(index, field) {
+  field.removeAttribute('onkeypress');
+  field.setAttribute('inputmode', 'decimal');
+  field.style.minWidth = 'calc(5ch + ' + horizontalBoxSpace(field) + 'px)';
+  $j(field).removeAttr('maxlength').mask('H0:M0', stopTimeMaskOptions).off('input.stopTime').on('input.stopTime', reapplyStopTimeMask);
+};
+
+var maskStopTimeFields = function() {
+  $j(stopTimeFieldSelector).each(maskStopTimeField);
+};
+
+maskStopTimeFields();
+
 document.onclick = function(event) {
   var targetElement = event.target;
   if ( targetElement.value == " Cancelar " ) {
@@ -84,6 +140,7 @@ var $addPontosButton = $j('#btn_add_tab_add_1');
 
 $addPontosButton.click(function(){
   setAutoComplete();
+  maskStopTimeFields();
 });
 
 

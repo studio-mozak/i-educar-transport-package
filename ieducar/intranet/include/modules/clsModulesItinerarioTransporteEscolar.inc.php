@@ -4,6 +4,8 @@ use iEducar\Legacy\Model;
 
 class clsModulesItinerarioTransporteEscolar extends Model
 {
+    public const TIME_PATTERN = '/^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/';
+
     public $cod_itinerario_transporte_escolar;
     public $ref_cod_rota_transporte_escolar;
     public $seq;
@@ -190,10 +192,9 @@ class clsModulesItinerarioTransporteEscolar extends Model
          (SELECT descricao
            FROM modules.ponto_transporte_escolar
            WHERE ref_cod_ponto_transporte_escolar = cod_ponto_transporte_escolar) as descricao,
-         (SELECT descricao || ', Placa: ' || placa || ', Motorista: ' || pessoa.nome
+         (SELECT " . clsModulesVeiculo::NAME_WITH_PLATE_AND_DRIVER_SQL . '
            FROM modules.veiculo
-           LEFT JOIN modules.motorista ON (motorista.cod_motorista = veiculo.ref_cod_motorista)
-           LEFT JOIN cadastro.pessoa ON (pessoa.idpes = motorista.ref_idpes)
+           ' . clsModulesVeiculo::DRIVER_PERSON_JOINS_SQL . "
            WHERE ref_cod_veiculo = cod_veiculo) as nome_onibus FROM {$this->_tabela}";
         $filtros = '';
 
@@ -380,12 +381,11 @@ class clsModulesItinerarioTransporteEscolar extends Model
 
     public function checktime($time)
     {
-        list($hour, $minute) = explode(':', $time);
+        return self::isValidTime($time);
+    }
 
-        if ($hour > -1 && $hour < 24 && $minute > -1 && $minute < 60 && is_numeric($hour) && is_numeric($minute)) {
-            return true;
-        } else {
-            return false;
-        }
+    public static function isValidTime($time): bool
+    {
+        return is_string($time) && preg_match(self::TIME_PATTERN, $time) === 1;
     }
 }

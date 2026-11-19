@@ -23,6 +23,7 @@ return new class extends clsDetalhe {
 
         $this->addDetalhe(['Código', $cod_pt]);
         $this->addDetalhe(['Pessoa', $registro['nome_pessoa']]);
+        $this->addDetalhe(['Ano letivo', $registro['ano']]);
         $this->addDetalhe(['Rota', $registro['nome_rota']]);
         $this->addDetalhe(['Destino', (trim($registro['nome_destino'])=='' ? $registro['nome_destino2'] : $registro['nome_destino'])]);
         $this->addDetalhe(['Ponto de embarque', $registro['nome_ponto'] ]);

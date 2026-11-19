@@ -1,5 +1,11 @@
 <?php
 
+use App\Models\Enums\DayOfWeek;
+use iEducar\Packages\Transport\Services\RoutePathService;
+use iEducar\Packages\Transport\View\RoutePathMap;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+
 return new class extends clsCadastro {
     /**
      * Referencia pega da session para o idpes do usuario atual
@@ -10,6 +16,31 @@ return new class extends clsCadastro {
 
     public $cod_rota;
     public $descricao;
+    public $abrangencia;
+    public $dias_semana;
+    public $weekdays_group;
+    public $rejectedInput = false;
+    public $km_ida;
+    public $km_volta;
+    public $km_pav;
+    public $km_npav;
+    public $trajeto_ida;
+    public $trajeto_volta;
+    public $trajeto_hash;
+
+    private $routePathMap;
+
+    private const INVALID_DISTANCE_MESSAGE = 'Quilometragem ou trajeto inválidos.<br>';
+
+    private const STOPS_KEPT_MESSAGE = 'Abrangência e dias salvos. Os pontos do itinerário não foram removidos; para apagar todos, use Excluir todos.<br>';
+
+    private const INVALID_COVERAGE_MESSAGE = 'Abrangência ou dias de funcionamento inválidos.<br>';
+
+    private const INVALID_TIME_MESSAGE = 'Linha %d: Informe a hora no formato HH:MM, ex.: 06:30.<br>';
+
+    private const NOT_SAVED_MESSAGE = 'Cadastro não realizado.<br>';
+
+    private const STOP_FIELDS = ['ref_cod_ponto_transporte_escolar', 'hora', 'tipo', 'ref_cod_veiculo'];
 
     // INCLUI NOVO
     public $pontos;
@@ -36,50 +67,152 @@ return new class extends clsCadastro {
 
         $obj_permissoes = new clsPermissoes();
         $obj_permissoes->permissao_cadastra(21238, $this->pessoa_logada, 7, "transporte_rota_det.php?cod_rota={$this->cod_rota}");
-        $volta = false;
-        if (is_numeric($this->cod_rota)) {
-            $obj = new clsModulesRotaTransporteEscolar($this->cod_rota);
-            $registro  = $obj->detalhe();
-            if ($registro) {
-                $this->descricao = $registro['descricao'];
-            } else {
-                $volta = true;
-            }
-        } else {
-            $volta = true;
-        }
 
-        if ($volta) {
+        if (!$this->loadSavedRoute()) {
             $this->simpleRedirect('transporte_rota_lst.php');
         }
-        $this->url_cancelar = "transporte_rota_det.php?cod_rota={$this->cod_rota}";
-        $this->nome_url_cancelar = 'Cancelar';
-
-        $this->breadcrumb('Editar itinerário', [
-        url('intranet/educar_transporte_escolar_index.php') => 'Transporte escolar',
-    ]);
 
         return $retorno;
     }
 
+    private function loadSavedRoute(bool $keepSubmittedValues = false): bool
+    {
+        if (!is_numeric($this->cod_rota)) {
+            return false;
+        }
+
+        $registro = (new clsModulesRotaTransporteEscolar($this->cod_rota))->detalhe();
+
+        if (!$registro) {
+            return false;
+        }
+
+        $this->descricao = $registro['descricao'];
+
+        if (!$keepSubmittedValues) {
+            $this->abrangencia = $registro['abrangencia'];
+            $this->dias_semana = clsModulesRotaTransporteEscolar::weekdaysFromColumn($registro['dias_semana']);
+
+            foreach (clsModulesRotaTransporteEscolar::DISTANCE_COLUMNS as $column) {
+                $this->$column = $this->routePathMap()->savedDistance($column);
+            }
+        }
+
+        $this->url_cancelar = "transporte_rota_det.php?cod_rota={$this->cod_rota}";
+        $this->nome_url_cancelar = 'Cancelar';
+
+        $this->breadcrumb('Editar itinerário', [
+            url('intranet/educar_transporte_escolar_index.php') => 'Transporte escolar',
+        ]);
+
+        return true;
+    }
+
+    private function routePathMap(): RoutePathMap
+    {
+        if (!$this->routePathMap instanceof RoutePathMap) {
+            $this->routePathMap = new RoutePathMap((int) $this->cod_rota, true);
+        }
+
+        return $this->routePathMap;
+    }
+
+    private function routePathInput(): ?array
+    {
+        $values = [];
+
+        foreach (clsModulesRotaTransporteEscolar::DISTANCE_COLUMNS as $column) {
+            if (!array_key_exists($column, $_POST)) {
+                continue;
+            }
+
+            $distance = RoutePathService::distanceFromInput($this->$column);
+
+            if ($distance === false) {
+                return null;
+            }
+
+            $values[$column] = $distance;
+        }
+
+        if (!filled($this->trajeto_hash)) {
+            return $values;
+        }
+
+        $path = RoutePathService::pathFromInput($this->trajeto_ida, $this->trajeto_volta, $this->trajeto_hash);
+
+        return $path === null ? null : $values + $path;
+    }
+
+    private function savedStops(): array
+    {
+        $itinerary = new clsModulesItinerarioTransporteEscolar();
+        $itinerary->setOrderby(' seq ASC');
+
+        return $itinerary->lista(null, $this->cod_rota) ?: [];
+    }
+
+    private function submittedValue(string $field, $key): string
+    {
+        $value = ((array) $this->$field)[$key] ?? '';
+
+        return is_scalar($value) ? (string) $value : '';
+    }
+
+    private function submittedStops(): array
+    {
+        $stops = [];
+
+        foreach (array_keys((array) $this->ref_cod_ponto_transporte_escolar) as $key) {
+            $stops[] = array_map(
+                fn (string $field) => e($this->submittedValue($field, $key)),
+                self::STOP_FIELDS
+            );
+        }
+
+        return $stops;
+    }
+
+    private function invalidTimeMessages(): string
+    {
+        $messages = '';
+        $line = 1;
+
+        foreach (array_keys((array) $this->ref_cod_ponto_transporte_escolar) as $key) {
+            $time = $this->submittedValue('hora', $key);
+
+            if ($time !== '' && !clsModulesItinerarioTransporteEscolar::isValidTime($time)) {
+                $messages .= sprintf(self::INVALID_TIME_MESSAGE, $line);
+            }
+
+            $line++;
+        }
+
+        return $messages;
+    }
+
     public function Gerar()
     {
-        if ($_POST) {
+        $showSavedRoute = !$_POST || $this->rejectedInput;
+
+        if (!$showSavedRoute) {
             foreach ($_POST as $campo => $val) {
                 $this->$campo = (!$this->$campo) ?  $val : $this->$campo ;
             }
+
+            $this->pontos = $this->submittedStops();
         }
 
         $this->campoRotulo('cod_rota', 'Código da rota', $this->cod_rota);
         $this->campoRotulo('descricao', 'Rota', $this->descricao);
+        $this->campoLista('abrangencia', 'Abrangência', ['' => 'Selecione'] + clsModulesRotaTransporteEscolar::COVERAGES, $this->abrangencia, '', false, '', '', false, false);
+        $this->campoRotulo('weekdays_group', 'Dias de funcionamento', $this->weekdaysCheckboxes());
 
         //---------------------INCLUI DISCIPLINAS---------------------//
         $this->campoQuebra();
 
-        if (is_numeric($this->cod_rota) && !$_POST) {
-            $obj = new clsModulesItinerarioTransporteEscolar();
-            $obj->setOrderby(' seq ASC');
-            $registros = $obj->lista(null, $this->cod_rota);
+        if (is_numeric($this->cod_rota) && $showSavedRoute) {
+            $registros = $this->savedStops();
             $qtd_pontos = 0;
             if ($registros) {
                 foreach ($registros as $campo) {
@@ -107,6 +240,15 @@ return new class extends clsCadastro {
         $this->campoQuebra();
         //---------------------FIM INCLUI DISCIPLINAS---------------------//
 
+        $this->addHtml($this->routePathMap()->formRow());
+        $this->campoMonetario('km_ida', 'Km ida', $this->km_ida, 10, 10, false, '', '', 'onChange', false, true, 'km');
+        $this->campoMonetario('km_volta', 'Km volta', $this->km_volta, 10, 10, false, '', '', 'onChange', false, true, 'km');
+        $this->campoMonetario('km_pav', 'Percurso pavimentado', $this->km_pav, 10, 10, false, '', '', 'onChange', false, true, 'km');
+        $this->campoMonetario('km_npav', 'Percurso não pavimentado', $this->km_npav, 10, 10, false, '', '', 'onChange', false, true, 'km');
+        $this->campoOculto('trajeto_ida', '');
+        $this->campoOculto('trajeto_volta', '');
+        $this->campoOculto('trajeto_hash', '');
+
         // carrega estilo para feedback messages, para exibir msg validação frequencia.
 
         $style = '/vendor/legacy/Portabilis/Assets/Stylesheets/Frontend.css';
@@ -131,35 +273,124 @@ return new class extends clsCadastro {
         $obj_permissoes = new clsPermissoes();
         $obj_permissoes->permissao_editar(21238, $this->pessoa_logada, 7, "transporte_rota_det.php?cod_rota={$this->cod_rota}");
 
-        if ($this->ref_cod_ponto_transporte_escolar) {
-            $obj  = new clsModulesItinerarioTransporteEscolar();
+        $routePath = $this->routePathInput();
 
-            $excluiu = $obj->excluirTodos($this->cod_rota);
+        if ($routePath === null) {
+            $this->mensagem = self::INVALID_DISTANCE_MESSAGE;
+            $this->showSavedRouteAfterRejection();
 
-            if ($excluiu) {
-                $sequencial = 1;
-                foreach ($this->ref_cod_ponto_transporte_escolar as $key => $ponto) {
-                    $obj = new clsModulesItinerarioTransporteEscolar(
-                        null,
-                        $this->cod_rota,
-                        $sequencial,
-                        $this->retornaCodigo($ponto),
-                        $this->retornaCodigo($this->ref_cod_veiculo[$key]),
-                        $this->hora[$key],
-                        $this->tipo[$key]
-                    );
-                    $cadastrou1 = $obj->cadastra();
-                    if (!$cadastrou1) {
-                        $this->mensagem = 'Cadastro não realizado.<br>';
+            return false;
+        }
 
-                        return false;
-                    }
-                    $sequencial++;
-                }
-            }
-            $this->mensagem .= 'Edição efetuada com sucesso.<br>';
+        $invalidTimes = $this->invalidTimeMessages();
+
+        if ($invalidTimes !== '') {
+            return $this->keepSubmittedInputAfterRejection($invalidTimes);
+        }
+
+        try {
+            $saved = DB::transaction(fn () => $this->saveRouteAndStops($routePath));
+        } catch (QueryException|RuntimeException) {
+            return $this->keepSubmittedInputAfterRejection(self::NOT_SAVED_MESSAGE);
+        }
+
+        if (!$saved) {
+            $this->mensagem = self::INVALID_COVERAGE_MESSAGE;
+            $this->showSavedRouteAfterRejection();
+
+            return false;
+        }
+
+        if (!$this->ref_cod_ponto_transporte_escolar && $this->savedStops() !== []) {
+            $this->mensagem = self::STOPS_KEPT_MESSAGE;
             $this->simpleRedirect("transporte_rota_det.php?cod_rota={$this->cod_rota}");
         }
+
+        $this->mensagem .= 'Edição efetuada com sucesso.<br>';
+        $this->simpleRedirect("transporte_rota_det.php?cod_rota={$this->cod_rota}");
+    }
+
+    private function saveRouteAndStops(array $routePath): bool
+    {
+        $route = new clsModulesRotaTransporteEscolar($this->cod_rota);
+
+        if (!$route->updateCoverageAndWeekdays($this->abrangencia, $this->dias_semana)) {
+            return false;
+        }
+
+        $route->updateDistancesAndPath($routePath);
+
+        if ($this->ref_cod_ponto_transporte_escolar) {
+            $this->replaceStops();
+        }
+
+        return true;
+    }
+
+    private function replaceStops(): void
+    {
+        (new clsModulesItinerarioTransporteEscolar)->excluirTodos($this->cod_rota);
+
+        $sequence = 1;
+
+        foreach ($this->ref_cod_ponto_transporte_escolar as $key => $stop) {
+            $itineraryStop = new clsModulesItinerarioTransporteEscolar(
+                null,
+                $this->cod_rota,
+                $sequence,
+                $this->retornaCodigo($stop),
+                $this->retornaCodigo($this->submittedValue('ref_cod_veiculo', $key)),
+                $this->submittedValue('hora', $key),
+                $this->submittedValue('tipo', $key)
+            );
+
+            if (!$itineraryStop->cadastra()) {
+                throw new RuntimeException(self::NOT_SAVED_MESSAGE);
+            }
+
+            $sequence++;
+        }
+    }
+
+    private function keepSubmittedInputAfterRejection(string $message): bool
+    {
+        $this->mensagem = $message;
+        $this->loadSavedRoute(keepSubmittedValues: true);
+
+        return false;
+    }
+
+    private function showSavedRouteAfterRejection(): void
+    {
+        $this->loadSavedRoute();
+        $this->rejectedInput = true;
+        $this->pontos = null;
+        $this->ref_cod_ponto_transporte_escolar = null;
+        $this->hora = null;
+        $this->tipo = null;
+        $this->ref_cod_veiculo = null;
+        $this->trajeto_ida = null;
+        $this->trajeto_volta = null;
+        $this->trajeto_hash = null;
+    }
+
+    private function weekdaysCheckboxes(): string
+    {
+        $checkedDays = clsModulesRotaTransporteEscolar::weekdaysFromInput($this->dias_semana) ?? [];
+        $checkboxes = array_map(function (DayOfWeek $day) use ($checkedDays) {
+            $checked = in_array($day->value, $checkedDays, true) ? ' checked' : '';
+
+            return "<label for=\"dias_semana_{$day->value}\" style=\"margin: 0 12px 0 0; font-weight: normal; cursor: pointer;\"><input type=\"checkbox\" name=\"dias_semana[]\" id=\"dias_semana_{$day->value}\" value=\"{$day->value}\"{$checked}> {$day->shortName()}</label>";
+        }, clsModulesRotaTransporteEscolar::WEEKDAYS_IN_SCREEN_ORDER);
+
+        [$mondayToThursday, $fridayToSunday] = array_chunk($checkboxes, 4);
+
+        $wrappingRow = 'display: flex; flex-wrap: wrap; row-gap: 6px;';
+
+        return "<span role=\"group\" aria-label=\"Dias de funcionamento\" style=\"{$wrappingRow} max-width: calc(100vw - 280px);\">"
+            . "<span style=\"{$wrappingRow}\">" . implode('', $mondayToThursday) . '</span>'
+            . "<span style=\"{$wrappingRow}\">" . implode('', $fridayToSunday) . '</span>'
+            . '</span>';
     }
 
     public function Excluir()
@@ -184,7 +415,12 @@ return new class extends clsCadastro {
 
     public function makeExtra()
     {
-        return file_get_contents(__DIR__ . '/scripts/transporte-itinerario-cad.js');
+        return file_get_contents(__DIR__ . '/scripts/transporte-itinerario-cad.js') . "\n" . $this->routePathMap()->script();
+    }
+
+    public function makeCss()
+    {
+        return $this->routePathMap()->css();
     }
 
     public function Formular()

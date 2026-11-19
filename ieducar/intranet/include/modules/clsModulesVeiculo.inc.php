@@ -4,6 +4,11 @@ use iEducar\Legacy\Model;
 
 class clsModulesVeiculo extends Model
 {
+    public const NAME_WITH_PLATE_AND_DRIVER_SQL = "concat_ws(', ', veiculo.descricao, 'Placa: ' || veiculo.placa, 'Motorista: ' || pessoa.nome)";
+
+    public const DRIVER_PERSON_JOINS_SQL = 'LEFT JOIN modules.motorista ON (motorista.cod_motorista = veiculo.ref_cod_motorista)
+                 LEFT JOIN cadastro.pessoa ON (pessoa.idpes = motorista.ref_idpes)';
+
     public $cod_veiculo;
     public $descricao;
     public $placa;
@@ -23,6 +28,8 @@ class clsModulesVeiculo extends Model
     public $ref_cod_empresa_transporte_escolar;
     public $ref_cod_motorista;
     public $observacao;
+    public $modelo;
+    public $terceirizado;
 
     public function __construct(
         $cod_veiculo = null,
@@ -43,7 +50,9 @@ class clsModulesVeiculo extends Model
         $ref_cod_empresa_transporte_escolar = null,
         $ref_cod_motorista = null,
         $observacao = null,
-        $data_licenca = null
+        $data_licenca = null,
+        $modelo = null,
+        $terceirizado = null
     ) {
 
         $this->_schema = 'modules.';
@@ -52,7 +61,7 @@ class clsModulesVeiculo extends Model
         $this->_campos_lista = $this->_todos_campos = ' cod_veiculo, descricao, placa, renavam, chassi, marca, ano_fabricacao,
        ano_modelo, passageiros, malha, ref_cod_tipo_veiculo, exclusivo_transporte_escolar,
        adaptado_necessidades_especiais, ativo, descricao_inativo, ref_cod_empresa_transporte_escolar,
-       ref_cod_motorista, observacao, data_licenca';
+       ref_cod_motorista, observacao, data_licenca, modelo, terceirizado';
 
         if (is_numeric($cod_veiculo)) {
             $this->cod_veiculo = $cod_veiculo;
@@ -125,6 +134,14 @@ class clsModulesVeiculo extends Model
         if (is_string($data_licenca)) {
             $this->data_licenca = $data_licenca;
         }
+
+        if (is_string($modelo)) {
+            $this->modelo = $modelo;
+        }
+
+        if (is_string($terceirizado)) {
+            $this->terceirizado = $terceirizado;
+        }
     }
 
     /**
@@ -157,14 +174,16 @@ class clsModulesVeiculo extends Model
             }
 
             if (is_string($this->placa)) {
+                $placa = $db->escapeString($this->placa);
                 $campos .= "{$gruda}placa";
-                $valores .= "{$gruda}'{$this->placa}'";
+                $valores .= "{$gruda}'{$placa}'";
                 $gruda = ', ';
             }
 
             if (is_string($this->renavam)) {
+                $renavam = $db->escapeString($this->renavam);
                 $campos .= "{$gruda}renavam";
-                $valores .= "{$gruda}'{$this->renavam}'";
+                $valores .= "{$gruda}'{$renavam}'";
                 $gruda = ', ';
             }
 
@@ -175,14 +194,23 @@ class clsModulesVeiculo extends Model
             }
 
             if (is_string($this->marca)) {
+                $marca = $db->escapeString($this->marca);
                 $campos .= "{$gruda}marca";
-                $valores .= "{$gruda}'{$this->marca}'";
+                $valores .= "{$gruda}'{$marca}'";
+                $gruda = ', ';
+            }
+
+            if (is_string($this->modelo)) {
+                $modelo = $db->escapeString($this->modelo);
+                $campos .= "{$gruda}modelo";
+                $valores .= "{$gruda}'{$modelo}'";
                 $gruda = ', ';
             }
 
             if (is_string($this->chassi)) {
+                $chassi = $db->escapeString($this->chassi);
                 $campos .= "{$gruda}chassi";
-                $valores .= "{$gruda}'{$this->chassi}'";
+                $valores .= "{$gruda}'{$chassi}'";
                 $gruda = ', ';
             }
 
@@ -228,6 +256,12 @@ class clsModulesVeiculo extends Model
                 $gruda = ', ';
             }
 
+            if (is_string($this->terceirizado)) {
+                $campos .= "{$gruda}terceirizado";
+                $valores .= "{$gruda}'{$this->terceirizado}'";
+                $gruda = ', ';
+            }
+
             if (is_string($this->ativo)) {
                 $campos .= "{$gruda}ativo";
                 $valores .= "{$gruda}'{$this->ativo}'";
@@ -235,8 +269,9 @@ class clsModulesVeiculo extends Model
             }
 
             if (is_string($this->descricao_inativo)) {
+                $descricaoInativo = $db->escapeString($this->descricao_inativo);
                 $campos .= "{$gruda}descricao_inativo";
-                $valores .= "{$gruda}'{$this->descricao_inativo}'";
+                $valores .= "{$gruda}'{$descricaoInativo}'";
                 $gruda = ', ';
             }
 
@@ -296,17 +331,32 @@ class clsModulesVeiculo extends Model
             }
 
             if (is_string($this->placa)) {
-                $set .= "{$gruda}placa = '{$this->placa}'";
+                $placa = $db->escapeString($this->placa);
+                $set .= "{$gruda}placa = '{$placa}'";
                 $gruda = ', ';
             }
 
             if (is_string($this->renavam)) {
-                $set .= "{$gruda}renavam = '{$this->renavam}'";
+                $renavam = $db->escapeString($this->renavam);
+                $set .= "{$gruda}renavam = '{$renavam}'";
+                $gruda = ', ';
+            }
+
+            if (is_string($this->chassi)) {
+                $chassi = $db->escapeString($this->chassi);
+                $set .= "{$gruda}chassi = '{$chassi}'";
                 $gruda = ', ';
             }
 
             if (is_string($this->marca)) {
-                $set .= "{$gruda}marca = '{$this->marca}'";
+                $marca = $db->escapeString($this->marca);
+                $set .= "{$gruda}marca = '{$marca}'";
+                $gruda = ', ';
+            }
+
+            if (is_string($this->modelo)) {
+                $modelo = $db->escapeString($this->modelo);
+                $set .= "{$gruda}modelo = '{$modelo}'";
                 $gruda = ', ';
             }
 
@@ -320,7 +370,7 @@ class clsModulesVeiculo extends Model
                 $gruda = ', ';
             }
 
-            if (is_numeric($this->this->passageiros)) {
+            if (is_numeric($this->passageiros)) {
                 $set .= "{$gruda}passageiros = '{$this->passageiros}'";
                 $gruda = ', ';
             }
@@ -345,13 +395,19 @@ class clsModulesVeiculo extends Model
                 $gruda = ', ';
             }
 
+            if (is_string($this->terceirizado)) {
+                $set .= "{$gruda}terceirizado = '{$this->terceirizado}'";
+                $gruda = ', ';
+            }
+
             if (is_string($this->ativo)) {
                 $set .= "{$gruda}ativo = '{$this->ativo}'";
                 $gruda = ', ';
             }
 
             if (is_string($this->descricao_inativo)) {
-                $set .= "{$gruda}descricao_inativo = '{$this->descricao_inativo}'";
+                $descricaoInativo = $db->escapeString($this->descricao_inativo);
+                $set .= "{$gruda}descricao_inativo = '{$descricaoInativo}'";
                 $gruda = ', ';
             }
 
@@ -436,16 +492,19 @@ class clsModulesVeiculo extends Model
         }
 
         if (is_string($placa)) {
+            $placa = $db->escapeString($placa);
             $filtros .= "{$whereAnd} placa = '{$placa}'";
             $whereAnd = ' AND ';
         }
 
         if (is_string($renavam)) {
+            $renavam = $db->escapeString($renavam);
             $filtros .= "{$whereAnd} renavam = '{$renavam}'";
             $whereAnd = ' AND ';
         }
 
         if (is_string($nome_motorista)) {
+            $nome_motorista = $db->escapeString($nome_motorista);
             $whereNomes .= "
         {$whereAnd} translate(upper((SELECT nome FROM modules.motorista m,cadastro.pessoa p WHERE ref_cod_motorista = cod_motorista AND p.idpes = m.ref_idpes)),'ÅÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇÝÑ','AAAAAAEEEEIIIIOOOOOUUUUCYN') LIKE translate(upper('%{$nome_motorista}%'),'ÅÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇÝÑ','AAAAAAEEEEIIIIOOOOOUUUUCYN')";
 
@@ -463,11 +522,13 @@ class clsModulesVeiculo extends Model
         }
 
         if (is_string($ativo)) {
+            $ativo = $db->escapeString($ativo);
             $filtros .= "{$whereAnd} ativo = '{$ativo}'";
             $whereAnd = ' AND ';
         }
 
         if (is_string($marca)) {
+            $marca = $db->escapeString($marca);
             $filtros .= "
         {$whereAnd} translate(upper(marca),'ÅÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇÝÑ','AAAAAAEEEEIIIIOOOOOUUUUCYN') LIKE translate(upper('%{$marca}%'),'ÅÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇÝÑ','AAAAAAEEEEIIIIOOOOOUUUUCYN')";
             $whereAnd = ' AND ';

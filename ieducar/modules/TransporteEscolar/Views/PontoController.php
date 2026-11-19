@@ -1,6 +1,7 @@
 <?php
 
 use iEducar\Modules\Addressing\LegacyAddressingFields;
+use iEducar\Packages\Transport\View\StopLocationMap;
 
 class PontoController extends Portabilis_Controller_Page_EditController
 {
@@ -71,18 +72,14 @@ class PontoController extends Portabilis_Controller_Page_EditController
 
         $this->viewAddress();
 
-        $this->inputsHelper()->text('latitude', ['required' => false]);
+        $this->inputsHelper()->hidden('latitude');
+        $this->inputsHelper()->hidden('longitude');
 
-        $this->inputsHelper()->text('longitude', ['required' => false]);
+        $stopLocationMap = new StopLocationMap;
+        $this->addHtml($stopLocationMap->formRow());
 
-        $script = [
-            '/vendor/legacy/Cadastro/Assets/Javascripts/Addresses.js',
-            '/lib/Utils/gmaps.js',
-            '/vendor/legacy/Portabilis/Assets/Javascripts/Frontend/ieducar.singleton_gmap.js'
-        ];
-
-        Portabilis_View_Helper_Application::loadJavascript($this, $script);
-
-        $this->loadResourceAssets($this->getDispatcher());
+        Portabilis_View_Helper_Application::loadJavascript($this, '/vendor/legacy/Cadastro/Assets/Javascripts/Addresses.js');
+        Portabilis_View_Helper_Application::embedStylesheet($this, $stopLocationMap->css());
+        Portabilis_View_Helper_Application::embedJavascript($this, $stopLocationMap->script());
     }
 }
