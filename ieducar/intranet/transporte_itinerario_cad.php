@@ -3,6 +3,7 @@
 use App\Models\Enums\DayOfWeek;
 use iEducar\Packages\Transport\Services\RoutePathService;
 use iEducar\Packages\Transport\View\RoutePathMap;
+use iEducar\Packages\Transport\View\TransportMap;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -420,7 +421,13 @@ return new class extends clsCadastro {
 
     public function makeCss()
     {
-        return $this->routePathMap()->css();
+        $errorColor = TransportMap::ERROR_COLOR;
+
+        return $this->routePathMap()->css() . <<<CSS
+
+form#formcadastro input.stop-time-invalid { border-color: {$errorColor}; }
+.stop-time-error { display: block; width: 0; min-width: 100%; font-size: 12px; color: {$errorColor}; }
+CSS;
     }
 
     public function Formular()

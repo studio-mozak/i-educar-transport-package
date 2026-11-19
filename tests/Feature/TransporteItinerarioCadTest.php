@@ -2,6 +2,7 @@
 
 namespace iEducar\Packages\Transport\Tests\Feature;
 
+use clsModulesItinerarioTransporteEscolar;
 use iEducar\Packages\Transport\Services\RoutePathService;
 use iEducar\Packages\Transport\Tests\CreatesDriverRecords;
 use iEducar\Packages\Transport\Tests\CreatesItineraryRecords;
@@ -121,11 +122,17 @@ class TransporteItinerarioCadTest extends TestCase
         $this->form($route)
             ->assertSee('name="hora[0]" id="hora[0]" value="06:30" size="6" maxlength="5"', false)
             ->assertSee("var stopTimeFieldSelector = 'input[name^=\"hora[\"]';", false)
-            ->assertSee('var stopTimeMaskOptions = { translation: { H: { pattern: /[0-2]/ }, M: { pattern: /[0-5]/ } } };', false)
             ->assertSee("field.removeAttribute('onkeypress');", false)
             ->assertSee("field.setAttribute('inputmode', 'decimal');", false)
             ->assertSee("field.style.minWidth = 'calc(5ch + ' + horizontalBoxSpace(field) + 'px)';", false)
-            ->assertSee("$j(field).removeAttr('maxlength').mask('H0:M0', stopTimeMaskOptions).off('input.stopTime').on('input.stopTime', reapplyStopTimeMask);", false)
+            ->assertSeeInOrder([
+                "$j(field).removeAttr('maxlength').mask('00:00').off('.stopTime')",
+                ".on('input.stopTime', reapplyStopTimeMask)",
+                ".on('input.stopTime', hideStopTimeErrorWhenValid)",
+                ".on('blur.stopTime', validateStopTime);",
+            ], false)
+            ->assertDontSee('translation', false)
+            ->assertDontSee("mask('H0:M0'", false)
             ->assertSeeInOrder([
                 'var digitsBeforeCaret = digitCount(this.value.slice(0, this.selectionStart));',
                 "$j(this).trigger('keyup.mask');",
@@ -140,6 +147,36 @@ class TransporteItinerarioCadTest extends TestCase
                 'setAutoComplete();',
                 'maskStopTimeFields();',
             ], false);
+    }
+
+    public function test_form_flags_an_invalid_stop_time_on_blur_with_the_rule_of_the_server(): void
+    {
+        $route = $this->routeRecord('Rota da Gameleira ENS019', 2026);
+
+        $this->form($route)
+            ->assertSee('var stopTimePattern = ' . clsModulesItinerarioTransporteEscolar::TIME_PATTERN . ';', false)
+            ->assertSee("var stopTimeErrorMessage = 'Hora inválida. Use HH:MM, ex.: 06:30.';", false)
+            ->assertSee("return value === '' || stopTimePattern.test(value);", false)
+            ->assertSee("\$j('<span>', { id: stopTimeErrorId(field), 'class': 'stop-time-error', text: stopTimeErrorMessage }).insertAfter(field);", false)
+            ->assertSee("\$j(field).addClass('stop-time-invalid').attr('aria-invalid', 'true');", false)
+            ->assertSee("field.setAttribute('aria-describedby', stopTimeErrorId(field));", false)
+            ->assertSee("\$j(field).removeClass('stop-time-invalid').removeAttr('aria-invalid aria-describedby');", false)
+            ->assertSeeInOrder([
+                "} else if (lastInputWasPointer) {",
+                'markStopTimeInvalid(this);',
+                'showStopTimeMessageAfterPointer(this);',
+                '} else {',
+                'showStopTimeError(this);',
+            ], false)
+            ->assertSee("\$j(document).on('pointerup.stopTimeMessage click.stopTimeMessage', function() {", false)
+            ->assertSee('if (field.isConnected && document.activeElement !== field && !isValidStopTime(field.value)) {', false)
+            ->assertSeeInOrder([
+                ".on('blur.stopTime', validateStopTime);",
+                'if (!isValidStopTime(field.value)) {',
+                'showStopTimeError(field);',
+            ], false)
+            ->assertSee('form#formcadastro input.stop-time-invalid { border-color: ' . TransportMap::ERROR_COLOR . '; }', false)
+            ->assertSee('.stop-time-error { display: block; width: 0; min-width: 100%; font-size: 12px; color: ' . TransportMap::ERROR_COLOR . '; }', false);
     }
 
     public function test_form_shows_description_and_plate_of_a_saved_vehicle_without_driver(): void
