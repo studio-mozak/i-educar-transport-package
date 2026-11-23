@@ -1,6 +1,7 @@
 <?php
 
 use App\Menu;
+use App\Models\LegacyMenuUserType;
 use App\Models\LegacyUserType;
 use App\Services\MenuCacheService;
 use Illuminate\Database\Migrations\Migration;
@@ -15,8 +16,6 @@ return new class extends Migration
     private const STOPS_PROCESS = 21239;
 
     private const ROUTES_PROCESS = 21238;
-
-    private const PERMISSIONS_TABLE = 'pmieducar.menu_tipo_usuario';
 
     public function up(): void
     {
@@ -56,11 +55,11 @@ return new class extends Migration
 
     private function swapPermissions(int $firstMenu, int $secondMenu): void
     {
-        $permissions = DB::table(self::PERMISSIONS_TABLE)->whereIn('menu_id', [$firstMenu, $secondMenu])->get();
+        $permissions = LegacyMenuUserType::query()->whereIn('menu_id', [$firstMenu, $secondMenu])->get();
 
-        DB::table(self::PERMISSIONS_TABLE)->whereIn('menu_id', [$firstMenu, $secondMenu])->delete();
+        LegacyMenuUserType::query()->whereIn('menu_id', [$firstMenu, $secondMenu])->delete();
 
-        DB::table(self::PERMISSIONS_TABLE)->insert($permissions->map(static fn (object $permission) => array_merge((array) $permission, [
+        LegacyMenuUserType::query()->insert($permissions->map(static fn (LegacyMenuUserType $permission) => array_merge($permission->getAttributes(), [
             'menu_id' => (int) $permission->menu_id === $firstMenu ? $secondMenu : $firstMenu,
         ]))->all());
     }

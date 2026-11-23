@@ -1,9 +1,10 @@
 <?php
 
 use iEducar\Packages\Transport\Database\TransportUserYearDuplicates;
+use iEducar\Packages\Transport\Models\TransportRoute;
+use iEducar\Packages\Transport\Models\TransportUser;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -14,18 +15,16 @@ return new class extends Migration
             $table->smallInteger('ano')->nullable();
         });
 
-        DB::update('
-            UPDATE modules.pessoa_transporte pt
-            SET ano = r.ano
-            FROM modules.rota_transporte_escolar r
-            WHERE r.cod_rota_transporte_escolar = pt.ref_cod_rota_transporte_escolar
-        ');
+        TransportUser::query()->update([
+            'ano' => TransportRoute::query()
+                ->select('ano')
+                ->whereColumn('cod_rota_transporte_escolar', 'modules.pessoa_transporte.ref_cod_rota_transporte_escolar'),
+        ]);
 
         TransportUserYearDuplicates::abortWhenAny();
 
-        DB::statement('ALTER TABLE modules.pessoa_transporte ALTER COLUMN ano SET NOT NULL');
-
         Schema::table('modules.pessoa_transporte', function (Blueprint $table) {
+            $table->smallInteger('ano')->nullable(false)->change();
             $table->unique(['ref_idpes', 'ano'], TransportUserYearDuplicates::UNIQUE_INDEX);
         });
     }
