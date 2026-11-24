@@ -1,61 +1,145 @@
 <?php
 
+use App\Models\City;
 use App\Models\Place;
-use iEducar\Modules\Addressing\LegacyAddressingFields;
+use iEducar\Packages\Transport\Services\AddressLocationService;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Auth;
 
 class PontoController extends ApiCoreController
 {
-    use LegacyAddressingFields;
+    public const LOCATE_FORBIDDEN_MESSAGE = 'Usuário sem permissão para cadastrar ou editar pontos.';
 
-    protected $_processoAp = 578; //verificar
+    protected $_processoAp = 21239;
     protected $_nivelAcessoOption = App_Model_NivelAcesso::SOMENTE_ESCOLA; // verificar
+
+    private ?array $coordinates = null;
+
+    private ?Place $place = null;
+
+    private array $addressValues = [];
+
+    private bool $hasAddress = false;
+
+    protected function validatesCoordinates(): bool
+    {
+        $sentCoordinates = $this->sentFields([
+            'latitude' => $this->getRequest()->latitude,
+            'longitude' => $this->getRequest()->longitude,
+        ]);
+
+        $this->coordinates = null;
+
+        if ($sentCoordinates === []) {
+            return true;
+        }
+
+        if (count($sentCoordinates) === 1) {
+            $this->messenger->append(clsModulesPontoTransporteEscolar::COORDINATES_TOGETHER_MESSAGE, 'error');
+
+            return false;
+        }
+
+        $coordinates = clsModulesPontoTransporteEscolar::coordinatesFromInput(
+            $sentCoordinates['latitude'],
+            $sentCoordinates['longitude']
+        );
+
+        foreach ($coordinates['errors'] as $message) {
+            $this->messenger->append($message, 'error');
+        }
+
+        if ($coordinates['errors'] !== []) {
+            return false;
+        }
+
+        $this->coordinates = ['latitude' => $coordinates['latitude'], 'longitude' => $coordinates['longitude']];
+
+        return true;
+    }
+
+    private function sentFields(array $values): array
+    {
+        return array_filter(
+            $values,
+            fn ($field) => array_key_exists($field, $_POST) || array_key_exists($field, $_GET),
+            ARRAY_FILTER_USE_KEY
+        );
+    }
+
+    protected function validatesAddress($id = null): bool
+    {
+        $this->place = $this->savedPlace($id);
+
+        $requestAddress = $this->requestAddress();
+        $this->addressValues = $this->place ? $this->sentFields($requestAddress) : $requestAddress;
+
+        $address = $this->place
+            ? array_merge($this->place->only(array_keys($requestAddress)), $this->addressValues)
+            : $this->addressValues;
+
+        $this->hasAddress = array_filter(
+            Arr::except($address, ['city_id']),
+            fn ($value) => filled($value)
+        ) !== [];
+
+        if ($this->hasAddress && blank($address['city_id'])) {
+            $this->messenger->append(clsModulesPontoTransporteEscolar::CITY_REQUIRED_MESSAGE, 'error');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function savedPlace($id): ?Place
+    {
+        $stop = (new clsModulesPontoTransporteEscolar($id))->detalhe();
+
+        if (!$stop || !is_numeric($stop['idlog'])) {
+            return null;
+        }
+
+        return Place::query()->find($stop['idlog']);
+    }
+
+    private function requestAddress(): array
+    {
+        return [
+            'address' => $this->getRequest()->address,
+            'number' => $this->getRequest()->number ?: null,
+            'complement' => $this->getRequest()->complement,
+            'neighborhood' => $this->getRequest()->neighborhood,
+            'city_id' => $this->getRequest()->city_id ?: null,
+            'postal_code' => idFederal2int((string) $this->getRequest()->postal_code),
+        ];
+    }
 
     protected function createOrUpdatePonto($id = null)
     {
-        $ponto = new clsModulesPontoTransporteEscolar();
+        $ponto = new clsModulesPontoTransporteEscolar;
         $ponto->cod_ponto_transporte_escolar = $id;
-
-        $detalhe = $ponto->detalhe();
-
-        if ($detalhe) {
-            $place = Place::query()->find($detalhe['idlog']);
-        }
-
-        // após cadastro não muda mais id pessoa
         $ponto->descricao = $this->getRequest()->desc;
 
-        $ponto->latitude = $this->getRequest()->latitude;
-        $ponto->longitude = $this->getRequest()->longitude;
-        $cep = idFederal2Int($this->getRequest()->postal_code);
+        if ($this->place || $this->hasAddress) {
+            $place = $this->place ?? new Place;
+            $place->fill($this->addressValues);
+            $place->save();
 
-        $this->address = $this->getRequest()->address;
-        $this->number = $this->getRequest()->number;
-        $this->complement = $this->getRequest()->complement;
-        $this->neighborhood = $this->getRequest()->neighborhood;
-        $this->postal_code = $this->getRequest()->postal_code;
-        $this->city_id = $this->getRequest()->city_id;
-
-        if (empty($place)) {
-            $place = new Place();
+            $ponto->cep = $place->postal_code;
+            $ponto->idbai = $place->getKey();
+            $ponto->idlog = $place->getKey();
+            $ponto->numero = $place->number;
+            $ponto->complemento = $place->complement;
         }
 
-        $place->fill([
-            'address' => $this->address,
-            'number' => $this->number ?: null,
-            'complement' => $this->complement,
-            'neighborhood' => $this->neighborhood,
-            'city_id' => $this->city_id,
-            'postal_code' => idFederal2int($this->postal_code),
-        ]);
-        $place->save();
+        $saved = is_null($id) ? $ponto->cadastra() : $ponto->edita();
 
-        $ponto->cep = $cep;
-        $ponto->idbai = $place->getKey();
-        $ponto->idlog = $place->getKey();
-        $ponto->numero = $this->number;
-        $ponto->complemento = $this->complement;
+        if ($saved && $this->coordinates !== null) {
+            $ponto->updateCoordinates($this->coordinates['latitude'], $this->coordinates['longitude']);
+        }
 
-        return (is_null($id) ? $ponto->cadastra() : $ponto->edita());
+        return $saved;
     }
 
     protected function get()
@@ -186,6 +270,7 @@ class PontoController extends ApiCoreController
                 $registro['ref_idpes_destino'],
                 $registro['observacao']
             );
+            $editaPessoa->ref_cod_ponto_transporte_escolar = '';
 
             $editaPessoa->edita();
         }
@@ -212,24 +297,64 @@ class PontoController extends ApiCoreController
         // TODO Addressing
     }
 
+    private function validatesAuthorizationToLocate(): bool
+    {
+        $permissions = $this->getClsPermissoes();
+        $process = $this->getBaseProcessoAp();
+        $user = Auth::id();
+
+        $can = $permissions->permissao_cadastra($process, $user, $this->_nivelAcessoOption)
+            || $permissions->permissao_editar($process, $user, $this->_nivelAcessoOption);
+
+        if (!$can) {
+            $this->messenger->append(self::LOCATE_FORBIDDEN_MESSAGE);
+        }
+
+        return $can;
+    }
+
+    private function getAddressLocation(): array
+    {
+        if (!$this->validatesAuthorizationToLocate()) {
+            return [];
+        }
+
+        $cityId = $this->getRequest()->city_id;
+        $city = is_numeric($cityId) ? City::query()->with('state')->find((int) $cityId) : null;
+
+        return (new AddressLocationService)->locate([
+            'address' => $this->getRequest()->address,
+            'number' => $this->getRequest()->number,
+            'neighborhood' => $this->getRequest()->neighborhood,
+            'city' => $city?->name,
+            'state' => $city?->state?->abbreviation,
+        ]);
+    }
+
     public function Gerar()
     {
         if ($this->isRequestFor('get', 'ponto')) {
             $this->appendResponse($this->get());
         } elseif ($this->isRequestFor('get', 'ponto-search')) {
             $this->appendResponse($this->search());
+        } elseif ($this->isRequestFor('get', AddressLocationService::API_RESOURCE)) {
+            $this->appendResponse($this->getAddressLocation());
         }
 
         // create
         elseif ($this->isRequestFor('post', 'ponto')) {
-            $this->appendResponse($this->post());
+            if ($this->validatesAuthorizationToChange() && $this->validatesCoordinates() && $this->validatesAddress()) {
+                $this->appendResponse($this->post());
+            }
         }
 
         // update
         elseif ($this->isRequestFor('put', 'ponto')) {
-            $this->appendResponse($this->put());
+            if ($this->validatesAuthorizationToEdit() && $this->validatesCoordinates() && $this->validatesAddress($this->getRequest()->id)) {
+                $this->appendResponse($this->put());
+            }
         } elseif ($this->isRequestFor('delete', 'ponto')) {
-            if ($this->validateIfPontoIsNotInUse()) {
+            if ($this->validatesAuthorizationToDestroy() && $this->validateIfPontoIsNotInUse()) {
                 $this->appendResponse($this->delete());
                 echo '<script language= "JavaScript">
                     location.href="intranet/transporte_ponto_lst.php";

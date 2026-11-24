@@ -2,6 +2,11 @@
 
 class VeiculoController extends ApiCoreController
 {
+    private const SEARCH_SELECT = 'SELECT DISTINCT cod_veiculo AS id, '
+        . clsModulesVeiculo::NAME_WITH_PLATE_AND_DRIVER_SQL . ' AS name
+                 FROM modules.veiculo
+                 ' . clsModulesVeiculo::DRIVER_PERSON_JOINS_SQL;
+
     protected $_processoAp = 578; //verificar
     protected $_nivelAcessoOption = App_Model_NivelAcesso::SOMENTE_ESCOLA; // verificar
 
@@ -33,6 +38,7 @@ class VeiculoController extends ApiCoreController
         $veiculo->data_licenca = Portabilis_Date_Utils::brToPgSQL($this->getRequest()->data_licenca);
         $veiculo->chassi = $this->getRequest()->chassi;
         $veiculo->marca = $this->getRequest()->marca;
+        $veiculo->modelo = $this->getRequest()->modelo;
         $veiculo->passageiros = $this->getRequest()->passageiros;
         $veiculo->ano_fabricacao = $this->getRequest()->ano_fabricacao;
         $veiculo->ano_modelo = $this->getRequest()->ano_modelo;
@@ -40,6 +46,7 @@ class VeiculoController extends ApiCoreController
         $veiculo->ref_cod_tipo_veiculo = $this->getRequest()->tipo;
         $veiculo->exclusivo_transporte_escolar = ($this->getRequest()->exclusivo_transporte_escolar == 'on' ? 'S' : 'N');
         $veiculo->adaptado_necessidades_especiais = ($this->getRequest()->adaptado_necessidades_especiais == 'on' ? 'S' : 'N');
+        $veiculo->terceirizado = ($this->getRequest()->terceirizado == 'on' ? 'S' : 'N');
         $veiculo->ativo = ($this->getRequest()->ativo == 'on' ? 'S' : 'N');
         $veiculo->descricao_inativo = $this->getRequest()->descricao_inativo;
         $veiculo->ref_cod_empresa_transporte_escolar = $this->getRequest()->empresa_id;
@@ -51,26 +58,18 @@ class VeiculoController extends ApiCoreController
 
     protected function sqlsForNumericSearch()
     {
-        $sqls[] = 'SELECT DISTINCT cod_veiculo AS id,
-                      (descricao || \', Placa: \' || placa || \', Motorista: \' || pessoa.nome) AS name
-                 FROM modules.veiculo
-                 LEFT JOIN modules.motorista ON (motorista.cod_motorista = veiculo.ref_cod_motorista)
-                 LEFT JOIN cadastro.pessoa ON (pessoa.idpes = motorista.ref_idpes)
-                WHERE (cod_veiculo::varchar LIKE $1||\'%\')
-                   OR (lower((placa)) LIKE \'%\'||lower(($1))||\'%\')';
+        $sqls[] = self::SEARCH_SELECT . "
+                WHERE (cod_veiculo::varchar LIKE $1||'%')
+                   OR (lower((placa)) LIKE '%'||lower(($1))||'%')";
 
         return $sqls;
     }
 
     protected function sqlsForStringSearch()
     {
-        $sqls[] = 'SELECT DISTINCT cod_veiculo AS id,
-                      (descricao || \', Placa: \' || placa || \', Motorista: \' || pessoa.nome) AS name
-                 FROM modules.veiculo
-                 LEFT JOIN modules.motorista ON (motorista.cod_motorista = veiculo.ref_cod_motorista)
-                 LEFT JOIN cadastro.pessoa ON (pessoa.idpes = motorista.ref_idpes)
-                WHERE (lower((descricao)) LIKE \'%\'||lower(($1))||\'%\')
-                   OR (lower((placa)) LIKE \'%\'||lower(($1))||\'%\')';
+        $sqls[] = self::SEARCH_SELECT . "
+                WHERE (lower((descricao)) LIKE '%'||lower(($1))||'%')
+                   OR (lower((placa)) LIKE '%'||lower(($1))||'%')";
 
         return $sqls;
     }
@@ -131,6 +130,7 @@ class VeiculoController extends ApiCoreController
             'data_licenca' => 'data_licenca',
             'chassi' => 'chassi',
             'marca' => 'marca',
+            'modelo' => 'modelo',
             'ano_fabricacao' => 'ano_fabricacao',
             'ano_modelo' => 'ano_modelo',
             'passageiros' => 'passageiros',
@@ -138,6 +138,7 @@ class VeiculoController extends ApiCoreController
             'ref_cod_tipo_veiculo' => 'tipo',
             'exclusivo_transporte_escolar' => 'exclusivo_transporte_escolar',
             'adaptado_necessidades_especiais' => 'adaptado_necessidades_especiais',
+            'terceirizado' => 'terceirizado',
             'ativo' => 'ativo',
             'descricao_inativo' => 'descricao_inativo',
             'ref_cod_empresa_transporte_escolar' => 'empresa',
@@ -151,6 +152,7 @@ class VeiculoController extends ApiCoreController
         $veiculo['motoristaNome'] = Portabilis_String_Utils::toUtf8($this->loadNomeMotorista($veiculo['motorista']));
         $veiculo['descricao'] = Portabilis_String_Utils::toUtf8($veiculo['descricao']);
         $veiculo['marca'] = Portabilis_String_Utils::toUtf8($veiculo['marca']);
+        $veiculo['modelo'] = Portabilis_String_Utils::toUtf8($veiculo['modelo']);
         $veiculo['placa'] = Portabilis_String_Utils::toUtf8($veiculo['placa']);
         $veiculo['chassi'] = Portabilis_String_Utils::toUtf8($veiculo['chassi']);
         $veiculo['descricao_inativo'] = Portabilis_String_Utils::toUtf8($veiculo['descricao_inativo']);

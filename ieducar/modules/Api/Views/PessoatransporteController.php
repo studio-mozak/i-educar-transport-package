@@ -33,8 +33,22 @@ class PessoatransporteController extends ApiCoreController
         $pt->ref_cod_rota_transporte_escolar = $this->getRequest()->rota;
         $pt->observacao = $this->getRequest()->observacao;
         $pt->turno = $this->getRequest()->turno;
+        $pt->ano = $this->selectedRouteYear();
 
         return (is_null($id) ? $pt->cadastra() : $pt->edita());
+    }
+
+    protected function selectedRouteYear()
+    {
+        $routeId = $this->getRequest()->rota;
+
+        if (!is_numeric($routeId)) {
+            return null;
+        }
+
+        $route = (new clsModulesRotaTransporteEscolar($routeId))->detalhe();
+
+        return $route['ano'] ?? null;
     }
 
     protected function get()
@@ -51,7 +65,8 @@ class PessoatransporteController extends ApiCoreController
             'ref_idpes_destino' => 'pessoaj',
             'ref_idpes' => 'pessoa',
             'observacao' => 'observacao',
-            'turno' => 'turno'
+            'turno' => 'turno',
+            'ano' => 'ano'
         ];
 
         $pt = Portabilis_Array_Utils::filter($pt, $attrs);
@@ -75,6 +90,8 @@ class PessoatransporteController extends ApiCoreController
 
     protected function post()
     {
+        $id = null;
+
         if ($this->validateSizeOfObservacao()) {
             $id = $this->createOrUpdatePessoaTransporte();
             if (is_numeric($id)) {
@@ -89,8 +106,9 @@ class PessoatransporteController extends ApiCoreController
 
     protected function put()
     {
+        $id = $this->getRequest()->id;
+
         if ($this->validateSizeOfObservacao()) {
-            $id = $this->getRequest()->id;
             $editou = $this->createOrUpdatePessoaTransporte($id);
 
             if ($editou) {
