@@ -9,6 +9,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (!Schema::hasIndex('modules.pessoa_transporte', TransportUserYearDuplicates::UNIQUE_INDEX)) {
+            return;
+        }
+
         Schema::table('modules.pessoa_transporte', function (Blueprint $table) {
             $table->dropUnique(TransportUserYearDuplicates::UNIQUE_INDEX);
         });
